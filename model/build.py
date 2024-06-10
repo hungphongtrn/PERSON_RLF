@@ -1,33 +1,32 @@
 from collections import OrderedDict
-import os
 
-from sentence_transformers import SentenceTransformer
+from loguru import logger
 import torch
 import torch.nn as nn
 
 from model import objectives
-from .clip_model import Transformer, QuickGELU, LayerNorm
-from .clip_vision import build_CLIPVision_from_openai_pretrained
-
-
-def load_sentence_transformers():
-    MODEL_CP_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../sentence_transformers_cp")
-    model = SentenceTransformer("sentence-transformers/clip-ViT-B-32-multilingual-v1", device="cpu", cache_folder=MODEL_CP_PATH)
-    return model
+from model.layers import Transformer, QuickGELU, LayerNorm
+from model.siglip.modeling_siglip import SiglipTextModel, SiglipVisionModel
 
 
 class IRRA(nn.Module):
-    def __init__(self, args, num_classes=11003):
+    def __init__(self, 
+                 args, num_classes=11003):
         super().__init__()
         self.args = args
         self.num_classes = num_classes
-        self._set_task()
-
-        self.image_model, base_cfg = build_CLIPVision_from_openai_pretrained(args.pretrain_choice, args.img_size, args.stride_size)
-        self.text_model = load_sentence_transformers()
-        # from text model word embedding (sequence_length, embed_dim) to (sequence_length, embed_dim)
-        self.proj_text = nn.Linear(768, base_cfg['embed_dim'])  # TODO: get the embed_dim from the model
-        self.embed_dim = base_cfg['embed_dim']
+        self.current_task = self.args.loss_names
+        logger.info(f'Training Model with {self.current_task} tasks')
+        
+        self.text_model = SiglipTextModel.from_pretrained(args.backbone_path)
+        # Resize the token and positional embeddings for training
+        if args.training:
+            self.text_model.resize_token_embeddings(args.vocab_size)
+        # self.text_model.resize_position_embeddings(args.text_length)
+        self.image_model = SiglipVisionModel.from_pretrained(args.backbone_path)
+        self.embed_dim = self.text_model.config.hidden_size
+        logger.info(f'Embedding Dimension: {self.embed_dim}')
+        self.interpolate_pos_encoding = args.interpolate_pos_encoding
 
         self.logit_scale = torch.ones([]) * (1 / args.temperature)
 
@@ -62,8 +61,6 @@ class IRRA(nn.Module):
             # init cross attn
             nn.init.normal_(self.cross_attn.in_proj_weight, std=attn_std)
             nn.init.normal_(self.cross_attn.out_proj.weight, std=proj_std)
-            nn.init.normal_(self.proj_text.weight, std=proj_std)
-            nn.init.normal_(self.proj_text.bias, std=proj_std)
 
             self.mlm_head = nn.Sequential(
                 OrderedDict([('dense', nn.Linear(self.embed_dim, self.embed_dim)),
@@ -74,44 +71,48 @@ class IRRA(nn.Module):
             nn.init.normal_(self.mlm_head.dense.weight, std=fc_std)
             nn.init.normal_(self.mlm_head.fc.weight, std=proj_std)
 
-    def _set_task(self):
-        loss_names = self.args.loss_names
-        self.current_task = [l.strip() for l in loss_names.split('+')]
-        print(f'Training Model with {self.current_task} tasks')
-
     def cross_former(self, q, k, v):
         x = self.cross_attn(
                 self.ln_pre_t(q),
                 self.ln_pre_i(k),
                 self.ln_pre_i(v),
                 need_weights=False)[0]
-        # x = x.permute(1, 0, 2)  # NLD -> LND
+        x = x.permute(1, 0, 2)  # NLD -> LND
         x = self.cross_modal_transformer(x)
-        # x = x.permute(1, 0, 2)  # LND -> NLD
+        x = x.permute(1, 0, 2)  # LND -> NLD
 
         x = self.ln_post(x)
         return x
 
     def encode_image(self, image):
-        x = self.image_model(image)
-        return x[:, 0, :].float()
-        # return x.float() # for CLIP ResNet visual model
+        """Encodes an image into a tensor.
+        Args:
+            image (PIL.Image): Image to be encoded.
+        Returns:
+            torch.Tensor: The encoded image, use pooler_output as the image embedding."""
+        x = self.image_model(pixel_values=image, interpolate_pos_encoding=self.interpolate_pos_encoding).pooler_output
+        return x
 
     def encode_text(self, text):
+        """Encodes text into a tensor.
+        Args:
+            text (dict): Text to be encoded, containing the keys "input_ids" and "attention_mask".
+        Returns:
+            torch.Tensor: The encoded text, use pooler_output as the sentence embedding."""
         # text will be a dict that has forms {"input_ids": ..., "attention_mask": ...}
-        x = self.text_model.forward(text)['sentence_embedding']
+        x = self.text_model(**text).pooler_output
         return x
 
     def forward(self, batch):
         ret = dict()
 
         images = batch['images']
-        caption_ids = batch['caption_ids']
-        image_feats = self.image_model(images)
-
-        i_feats = image_feats[:, 0, :].float()  # extract the first feature for each image
-        # i_feats = image_feats.float() # for CLIP ResNet visual model
-        t_feats = self.text_model.forward(caption_ids)['sentence_embedding']
+        caption_input = batch['caption_input']
+        image_model_output = self.image_model(images, interpolate_pos_encoding=self.interpolate_pos_encoding)
+        text_model_output = self.text_model(**caption_input)
+        
+        i_feats = image_model_output.pooler_output  # image embedding
+        t_feats = text_model_output.pooler_output   # text embedding
 
         logit_scale = self.logit_scale
         ret.update({'temperature': 1 / logit_scale})
@@ -139,35 +140,24 @@ class IRRA(nn.Module):
             ret.update({'txt_acc': text_precision})
 
         if 'mlm' in self.current_task:
-            mlm_ids = batch['mlm_ids']
+            mlm_inputs = batch['mlm_inputs']
 
-            mlm_feats = self.text_model.forward(mlm_ids)['token_embeddings']
-            down_scaled_mlm_feats = self.proj_text(mlm_feats)
+            image_feats = image_model_output.last_hidden_state   # image features
 
-            x = self.cross_former(down_scaled_mlm_feats, image_feats, image_feats)
+            mlm_feats = self.text_model.forward(**mlm_inputs).last_hidden_state  # masked text features
 
-            x = self.mlm_head(x)  # [batch_size, text_len, num_colors]
+            x = self.cross_former(mlm_feats, image_feats, image_feats)
 
-            scores = x.float().reshape(-1, self.args.vocab_size)
+            x = self.mlm_head(x)  
+
+            scores = x.reshape(-1, self.args.vocab_size)
             mlm_labels = batch['mlm_labels'].reshape(-1)  # [batch_size * text_len]
             ret.update({'mlm_loss': objectives.compute_mlm(scores, mlm_labels)*self.args.mlm_loss_weight})
 
             pred = scores.max(1)[1]
-            # return the idx that is not -100 but smaller than 77
-            mlm_label_idx = torch.nonzero(mlm_labels != -100)
-            mlm_label_idx = mlm_label_idx[mlm_label_idx < 77]
-            # print("mlm_label_idx", mlm_label_idx)
-            # mlm_label_idx = torch.nonzero(mlm_labels)
-            # print("pred[mlm_label_idx]", pred[mlm_label_idx])
-            # print("mlm_labels[mlm_label_idx]", mlm_labels[mlm_label_idx])
-            
+            mlm_label_idx = torch.nonzero(mlm_labels != 1)
+
             acc = (pred[mlm_label_idx] == mlm_labels[mlm_label_idx]).float().mean()
             ret.update({'mlm_acc': acc})
 
         return ret
-
-
-def build_model(args, num_classes=11003):
-    model = IRRA(args, num_classes)
-    # covert model to fp16
-    return model

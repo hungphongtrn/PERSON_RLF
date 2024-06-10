@@ -1,29 +1,18 @@
 from typing import Any, Optional
-import os
 
-from loguru import logger as logging
+from loguru import logger
 from prettytable import PrettyTable
 from torch.utils.data import Dataset
-from transformers import AutoTokenizer
 import torch
 
 from utils.iotools import read_image
-
-
-def load_tokenizer():
-    TOKENIZER_CP_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../sentence_transformers_cp")
-    tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/clip-ViT-B-32-multilingual-v1", cache_dir=TOKENIZER_CP_PATH)
-    return tokenizer
-
-
-TOKENIZER = load_tokenizer()
 
 
 class BaseDataset(object):
     """
     Base class of text to image reid dataset
     """
-    logger = logging.bind(name='PRLF Dataset')
+    logger = logger
     def show_dataset_info(self):
         num_train_pids, num_train_imgs, num_train_captions = len(
             self.train_id_container), len(self.train_annos), len(self.train)
@@ -46,22 +35,28 @@ class BaseDataset(object):
         self.logger.info('\n' + str(table))
 
 
-def tokenize(caption: str, tokenizer, text_length=77, truncate=True):
-    inputs = tokenizer(caption, max_length=text_length, padding='max_length', truncation=truncate, return_tensors='pt')
+def tokenize(caption: str, tokenizer, text_length=187, truncate=True):
+    inputs = tokenizer(caption,
+                       max_length=text_length,
+                       padding="max_length",
+                       truncation=truncate,
+                       return_tensors='pt',
+                       return_attention_mask=True)
     return inputs
 
 
 class ImageTextDataset(Dataset):
     def __init__(self,
+                 tokenizer,
                  dataset,
                  transform=None,
-                 text_length: int = 77,
+                 text_length: int = 64,
                  truncate: bool = True):
         self.dataset = dataset
         self.transform = transform
         self.text_length = text_length
         self.truncate = truncate
-        self.tokenizer = TOKENIZER
+        self.tokenizer = tokenizer
 
     def __len__(self):
         return len(self.dataset)
@@ -72,13 +67,13 @@ class ImageTextDataset(Dataset):
         if self.transform is not None:
             img = self.transform(img)
 
-        tokens = tokenize(caption, tokenizer=self.tokenizer, text_length=self.text_length, truncate=self.truncate)
+        tokens = tokenize(caption, tokenizer=self.tokenizer, text_length=self.text_length, truncate=self.truncate).data
 
         ret = {
             'pids': pid,
             'image_ids': image_id,
             'images': img,
-            'caption_ids': tokens,
+            'caption_input': tokens,
         }
 
         return ret
@@ -106,15 +101,16 @@ class ImageDataset(Dataset):
 
 class TextDataset(Dataset):
     def __init__(self,
+                 tokenizer,
                  caption_pids,
                  captions,
-                 text_length: int = 77,
+                 text_length: int = 64,
                  truncate: bool = True):
         self.caption_pids = caption_pids
         self.captions = captions
         self.text_length = text_length
         self.truncate = truncate
-        self.tokenizer = TOKENIZER
+        self.tokenizer = tokenizer
 
     def __len__(self):
         return len(self.caption_pids)
@@ -122,19 +118,20 @@ class TextDataset(Dataset):
     def __getitem__(self, index):
         pid, caption = self.caption_pids[index], self.captions[index]
 
-        caption = tokenize(caption, tokenizer=self.tokenizer, text_length=self.text_length, truncate=self.truncate)
+        caption = tokenize(caption, tokenizer=self.tokenizer, text_length=self.text_length, truncate=self.truncate).data
 
         return {
             "pids": pid,
-            "caption_ids": caption,
+            "caption_input": caption,
         }
 
 
 class ImageTextMLMDataset(Dataset):
     def __init__(self,
+                 tokenizer,
                  dataset,
                  transform=None,
-                 text_length: int = 77,
+                 text_length: int = 64,
                  truncate: bool = True):
         self.dataset = dataset
         self.transform = transform
@@ -142,7 +139,7 @@ class ImageTextMLMDataset(Dataset):
         self.truncate = truncate
         self.mlm_probability = 0.15
 
-        self.tokenizer = TOKENIZER
+        self.tokenizer = tokenizer
 
     def __len__(self):
         return len(self.dataset)
@@ -153,7 +150,7 @@ class ImageTextMLMDataset(Dataset):
         if self.transform is not None:
             img = self.transform(img)
 
-        caption_tokens = tokenize(caption, tokenizer=self.tokenizer, text_length=self.text_length, truncate=self.truncate)
+        caption_tokens = tokenize(caption, tokenizer=self.tokenizer, text_length=self.text_length, truncate=self.truncate).data
 
         inputs, labels = self.torch_mask_tokens(inputs=caption_tokens)
 
@@ -161,8 +158,8 @@ class ImageTextMLMDataset(Dataset):
             'pids': pid,
             'image_ids': image_id,
             'images': img,
-            'caption_ids': caption_tokens,
-            'mlm_ids': inputs,
+            'caption_input': caption_tokens,
+            'mlm_inputs': inputs,
             'mlm_labels': labels
         }
 
@@ -189,7 +186,7 @@ class ImageTextMLMDataset(Dataset):
 
         probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
         masked_indices = torch.bernoulli(probability_matrix).bool()
-        labels['input_ids'][~masked_indices] = -100  # We only compute loss on masked tokens
+        labels['input_ids'][~masked_indices] = self.tokenizer.pad_token_id  # We only compute loss on masked tokens
 
         # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
         indices_replaced = torch.bernoulli(torch.full(labels['input_ids'].shape, 0.8)).bool() & masked_indices
@@ -201,4 +198,4 @@ class ImageTextMLMDataset(Dataset):
         inputs['input_ids'][indices_random] = random_words[indices_random]
 
         # The rest of the time (10% of the time) we keep the masked input tokens unchanged
-        return inputs, labels
+        return inputs, labels['input_ids']

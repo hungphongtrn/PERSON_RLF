@@ -1,0 +1,5 @@
+siglip_checkpoints
+.trunk
+# ignore all __pycache__ directories regardless of position in the tree
+**/__pycache__
+VN3K

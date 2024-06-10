@@ -37,7 +37,7 @@ class VN3K(BaseDataset):
                 train_annos.append(anno)
             elif anno['split'] == 'test':
                 test_annos.append(anno)
-            else:
+            elif anno['split'] == 'validate':
                 val_annos.append(anno)
         return train_annos, test_annos, val_annos
 

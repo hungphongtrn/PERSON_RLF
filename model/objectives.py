@@ -43,7 +43,7 @@ def compute_sdm(image_fetures, text_fetures, pid, logit_scale, image_id=None, fa
 
 
 def compute_mlm(scores, labels):
-    ce = nn.CrossEntropyLoss(ignore_index=-100)
+    ce = nn.CrossEntropyLoss(ignore_index=1)
     return ce(scores, labels)
 
 

@@ -1,10 +1,7 @@
-import logging
-import os
-
-import numpy as np
+from prettytable import PrettyTable
+from loguru import logger
 import torch
 import torch.nn.functional as F
-from prettytable import PrettyTable
 
 
 def rank(similarity, q_pids, g_pids, max_rank=10, get_mAP=True):
@@ -47,7 +44,7 @@ class Evaluator:
     def __init__(self, img_loader, txt_loader):
         self.img_loader = img_loader  # gallery
         self.txt_loader = txt_loader  # query
-        self.logger = logging.getLogger("IRRA.eval")
+        self.logger = logger
 
     def _compute_embedding(self, model):
         model = model.eval()

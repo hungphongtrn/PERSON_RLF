@@ -1,7 +1,7 @@
-from prettytable import PrettyTable
-from loguru import logger
 import torch
 import torch.nn.functional as F
+from loguru import logger
+from prettytable import PrettyTable
 
 
 def rank(similarity, q_pids, g_pids, max_rank=10, get_mAP=True):
@@ -54,7 +54,7 @@ class Evaluator:
         # text
         for batch in self.txt_loader:
             pid = batch["pids"]
-            caption = batch["caption_ids"]
+            caption = batch["caption_input"]
             caption = {
                 "input_ids": caption["input_ids"].to(device),
                 "attention_mask": caption["attention_mask"].to(device),

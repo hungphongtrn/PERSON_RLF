@@ -3,7 +3,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def compute_sdm(image_fetures, text_fetures, pid, logit_scale, image_id=None, factor=0.3, epsilon=1e-8):
+def compute_sdm(
+    image_fetures,
+    text_fetures,
+    pid,
+    logit_scale,
+    image_id=None,
+    factor=0.3,
+    epsilon=1e-8,
+):
     """
     Similarity Distribution Matching
     """
@@ -33,11 +41,17 @@ def compute_sdm(image_fetures, text_fetures, pid, logit_scale, image_id=None, fa
     labels_distribute = labels / labels.sum(dim=1)
 
     i2t_pred = F.softmax(image_proj_text, dim=1)
-    i2t_loss = i2t_pred * (F.log_softmax(image_proj_text, dim=1) - torch.log(labels_distribute + epsilon))
+    i2t_loss = i2t_pred * (
+        F.log_softmax(image_proj_text, dim=1) - torch.log(labels_distribute + epsilon)
+    )
     t2i_pred = F.softmax(text_proj_image, dim=1)
-    t2i_loss = t2i_pred * (F.log_softmax(text_proj_image, dim=1) - torch.log(labels_distribute + epsilon))
+    t2i_loss = t2i_pred * (
+        F.log_softmax(text_proj_image, dim=1) - torch.log(labels_distribute + epsilon)
+    )
 
-    loss = torch.mean(torch.sum(i2t_loss, dim=1)) + torch.mean(torch.sum(t2i_loss, dim=1))
+    loss = torch.mean(torch.sum(i2t_loss, dim=1)) + torch.mean(
+        torch.sum(t2i_loss, dim=1)
+    )
 
     return loss
 
@@ -55,7 +69,6 @@ def compute_itc(image_features, text_features, logit_scale):
     labels = torch.arange(start=0, end=batch_size, dtype=torch.int64)
     labels = labels.to(image_features.device)
 
-    
     # normalized features
     image_norm = image_features / image_features.norm(dim=-1, keepdim=True)
     text_norm = text_features / text_features.norm(dim=-1, keepdim=True)
@@ -65,8 +78,8 @@ def compute_itc(image_features, text_features, logit_scale):
     logits_per_text = logits_per_image.t()
 
     loss_i = F.cross_entropy(logits_per_image, labels)
-    loss_t =F.cross_entropy(logits_per_text, labels)
-    loss = (loss_i +  loss_t)/2
+    loss_t = F.cross_entropy(logits_per_text, labels)
+    loss = (loss_i + loss_t) / 2
 
     return loss
 
@@ -78,7 +91,7 @@ def compute_id(image_logits, text_logits, labels):
     criterion = nn.CrossEntropyLoss(reduction="mean")
 
     loss = criterion(image_logits, labels) + criterion(text_logits, labels)
-    
+
     return loss / 2
 
 
@@ -109,10 +122,16 @@ def compute_cmpm(image_embeddings, text_embeddings, labels, epsilon=1e-8):
     labels_mask_norm = labels_mask / labels_mask.norm(dim=1)
 
     i2t_pred = F.softmax(image_proj_text, dim=1)
-    i2t_loss = i2t_pred * (F.log_softmax(image_proj_text, dim=1) - torch.log(labels_mask_norm + epsilon))
+    i2t_loss = i2t_pred * (
+        F.log_softmax(image_proj_text, dim=1) - torch.log(labels_mask_norm + epsilon)
+    )
     t2i_pred = F.softmax(text_proj_image, dim=1)
-    t2i_loss = t2i_pred * (F.log_softmax(text_proj_image, dim=1) - torch.log(labels_mask_norm + epsilon))
+    t2i_loss = t2i_pred * (
+        F.log_softmax(text_proj_image, dim=1) - torch.log(labels_mask_norm + epsilon)
+    )
 
-    cmpm_loss = torch.mean(torch.sum(i2t_loss, dim=1)) + torch.mean(torch.sum(t2i_loss, dim=1))
+    cmpm_loss = torch.mean(torch.sum(i2t_loss, dim=1)) + torch.mean(
+        torch.sum(t2i_loss, dim=1)
+    )
 
     return cmpm_loss

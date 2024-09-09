@@ -1,6 +1,7 @@
+import logging
+
 import pytorch_lightning as pl
 import torch
-from loguru import logger
 from torch.utils.data import DataLoader
 
 from datasets.bases import (
@@ -21,7 +22,7 @@ from utils.tokenizer import get_tokenizer
 
 # from torch.utils.data.distributed import DistributedSampler
 
-
+logger = logging.getLogger(__name__)
 
 class IRRADataModule(pl.LightningDataModule):
     def __init__(self, args, transforms=None):

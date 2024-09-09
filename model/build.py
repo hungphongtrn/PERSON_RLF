@@ -1,6 +1,6 @@
+import logging
 from collections import OrderedDict
 
-from loguru import logger
 import torch
 import torch.nn as nn
 
@@ -8,6 +8,7 @@ from model import objectives
 from model.layers import Transformer, QuickGELU, LayerNorm
 from model.siglip.modeling_siglip import SiglipTextModel, SiglipVisionModel
 
+logger = logging.getLogger(__name__)
 
 class IRRA(nn.Module):
     def __init__(self, 

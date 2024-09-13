@@ -47,5 +47,7 @@ trainer = L.Trainer(
     default_root_dir="logs/",
     enable_progress_bar=True,
     enable_model_summary=True,
+    # accumulate_grad_batches=config.accumulate_grad_batches,
+    accelerator=config.accelerator,
 )
 trainer.fit(model, train_dataloaders=train_loader)

@@ -4,3 +4,5 @@ siglip_checkpoints
 **/__pycache__
 VN3K
 logs
+.trunk
+tb_logs

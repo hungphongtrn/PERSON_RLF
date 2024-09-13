@@ -24,8 +24,8 @@ stride_size: 16
 text_length: 64
 vocab_size: 250001
 
-optimizer: AdamW
-lr: 1e-5
+optimizer: AdamW8bit
+lr: 1e-6
 bias_lr_factor: 2.
 momentum: 0.9
 weight_decay: 4e-5
@@ -50,3 +50,5 @@ root_dir: .
 batch_size: 1
 test_batch_size: 64
 num_workers: 4
+# accumulate_grad_batches: 2
+accelerator: gpu

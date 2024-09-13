@@ -46,7 +46,6 @@ class BaseDataset(object):
 def tokenize(caption: str, tokenizer, text_length=187, truncate=True):
     inputs = tokenizer(
         caption,
-        max_length=text_length,
         padding="max_length",
         truncation=truncate,
         return_tensors="pt",

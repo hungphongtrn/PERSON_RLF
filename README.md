@@ -24,3 +24,8 @@ python prepare_checkpoints.py
     }
 }
 ```
+
+# Logs
+
+- 10/9/24: Successfully ran 30% of the first epoch but encounter an error related to CUDA which might be due to NAN values in the loss. Next steps:
+    - Investigate what caused NaN values in the loss

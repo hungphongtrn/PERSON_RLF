@@ -1,4 +1,5 @@
 import torch
+import bitsandbytes
 
 from .lr_scheduler import LRSchedulerWithWarmup
 
@@ -41,6 +42,29 @@ def build_optimizer(args, model):
             betas=(args.alpha, args.beta),
             eps=1e-8,
         )
+    elif args.optimizer == "PagedAdamW32bit":
+        optimizer = bitsandbytes.optim.PagedAdamW32bit(
+            params,
+            lr=args.lr,
+            betas=(args.alpha, args.beta),
+            eps=1e-8,
+        )
+    elif args.optimizer == "PagedAdamW8bit":
+        optimizer = bitsandbytes.optim.PagedAdamW8bit(
+            params,
+            lr=args.lr,
+            betas=(args.alpha, args.beta),
+            eps=1e-8,
+        )
+
+    elif args.optimizer == "AdamW8bit":
+        optimizer = bitsandbytes.optim.AdamW8bit(
+            params,
+            lr=args.lr,
+            betas=(args.alpha, args.beta),
+            eps=1e-8,
+        )
+
     else:
         NotImplementedError
 

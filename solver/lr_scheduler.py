@@ -1,3 +1,5 @@
+import warnings
+
 from bisect import bisect_right
 from math import cos, pi
 
@@ -21,8 +23,9 @@ class LRSchedulerWithWarmup(_LRScheduler):
     ):
         if not list(milestones) == sorted(milestones):
             raise ValueError(
-                "Milestones should be a list of"
-                " increasing integers. Got {}".format(milestones),
+                "Milestones should be a list of" " increasing integers. Got {}".format(
+                    milestones
+                ),
             )
         if mode not in ("step", "exp", "poly", "cosine", "linear"):
             raise ValueError(
@@ -31,8 +34,9 @@ class LRSchedulerWithWarmup(_LRScheduler):
             )
         if warmup_method not in ("constant", "linear"):
             raise ValueError(
-                "Only 'constant' or 'linear' warmup_method accepted"
-                "got {}".format(warmup_method)
+                "Only 'constant' or 'linear' warmup_method accepted" "got {}".format(
+                    warmup_method
+                )
             )
         self.milestones = milestones
         self.mode = mode
@@ -46,7 +50,6 @@ class LRSchedulerWithWarmup(_LRScheduler):
         super().__init__(optimizer, last_epoch)
 
     def get_lr(self):
-
         if self.last_epoch < self.warmup_epochs:
             if self.warmup_method == "constant":
                 warmup_factor = self.warmup_factor
@@ -67,7 +70,7 @@ class LRSchedulerWithWarmup(_LRScheduler):
 
         if self.mode == "exp":
             factor = epoch_ratio
-            return [base_lr * self.power ** factor for base_lr in self.base_lrs]
+            return [base_lr * self.power**factor for base_lr in self.base_lrs]
         if self.mode == "linear":
             factor = 1 - epoch_ratio
             return [base_lr * factor for base_lr in self.base_lrs]
@@ -75,10 +78,14 @@ class LRSchedulerWithWarmup(_LRScheduler):
         if self.mode == "poly":
             factor = 1 - epoch_ratio
             return [
-                self.target_lr + (base_lr - self.target_lr) * self.power ** factor
+                self.target_lr + (base_lr - self.target_lr) * self.power**factor
                 for base_lr in self.base_lrs
             ]
         if self.mode == "cosine":
+            warnings.warn(
+                "milestones and gamma parameters are ignored when using cosine mode",
+            )
+
             factor = 0.5 * (1 + cos(pi * epoch_ratio))
             return [
                 self.target_lr + (base_lr - self.target_lr) * factor

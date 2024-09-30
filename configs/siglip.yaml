@@ -1,0 +1,94 @@
+# Tokenizer
+tokenizer:
+  type: model.siglip.tokenization_siglip.SiglipTokenizer
+  pretrained_model_name_or_path: /home/phongtnh/Person-Search/person_rlf/siglip_checkpoints
+  vocab_size: &vocab_size 250001
+  model_max_length: &model_max_length 64
+
+# Backbone
+backbone:
+  type: model.siglip.modeling_siglip.SiglipModel
+  path: siglip_checkpoints/model.safetensors
+  config_type: model.siglip.configuration_siglip.SiglipConfig
+  original_model_include_cls_token: false
+  # text config
+  text_config:
+    vocab_size: *vocab_size
+    max_position_embeddings: *model_max_length
+  vision_config:
+    image_size: &size [384, 128]
+  num_visual_horizontal_patches: 8
+  num_visual_vertical_patches: 24
+  embedding_dim: 768
+
+training: true
+dataset_root_dir: .
+img_size: *size
+distributed: false
+
+# Experiment config
+experiment:
+  ckpt_path:
+  version: optimizer_effect_check_adamw
+  # Dataset
+  dataset_name: VN3K_EN
+
+  img_aug: true
+  text_length: *model_max_length
+  batch_size: 24
+  sampler: identity
+  test_batch_size: 64
+  num_instance: 1
+  num_workers: 4
+
+  MLM: true
+  mlm_loss_weight: 1.0
+
+  ID: true
+  id_loss_weight: 1.0
+
+  SDM: true
+  sdm_loss_weight: 1.0
+
+  temperature: 0.02
+
+  cmt_depth: 4
+
+  # Train
+  trainer:
+    default_root_dir: /mnt/data/user_data/phongtnh/person_search/person_rlf/logs
+    max_epochs: &max_epoch 5
+    precision: bf16-mixed
+    # accumulate_grad_batches: 1
+    accelerator: gpu
+    gradient_clip_val: 1.0
+    gradient_clip_algorithm: value
+    log_every_n_steps: 1
+    detect_anomaly: false
+    enable_progress_bar: true
+    enable_model_summary: true
+    enable_checkpointing: true
+
+# Optimizer
+optimizer:
+  type: torch.optim.AdamW
+  lr: 1e-4
+  lr_factor: 5.0
+  bias_lr_factor: 2.0
+  weight_decay: 0.02
+  weight_decay_bias: 0.0
+  betas: [0.9, 0.98]
+  eps: 1.0e-8
+
+# Scheduler
+scheduler:
+  type: solver.lr_scheduler.LRSchedulerWithWarmup
+  milestones: [3] # ignored in cosine mode
+  gamma: 0.1 # ignored in cosine mode
+  warmup_factor: 0.1
+  warmup_epochs: 1
+  warmup_method: linear
+  total_epochs: *max_epoch
+  mode: cosine
+  target_lr: 0.0
+  power: 0.9

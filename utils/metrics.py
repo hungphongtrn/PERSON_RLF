@@ -6,6 +6,7 @@ from prettytable import PrettyTable
 
 logger = logging.getLogger(__name__)
 
+
 def rank(similarity, q_pids, g_pids, max_rank=10, get_mAP=True):
     if get_mAP:
         indices = torch.argsort(similarity, dim=1, descending=True)
@@ -56,13 +57,12 @@ class Evaluator:
         # text
         for batch in self.txt_loader:
             pid = batch["pids"]
-            caption = batch["caption_input"]
-            caption = {
-                "input_ids": caption["input_ids"].to(device),
-                "attention_mask": caption["attention_mask"].to(device),
+            caption_input = {
+                "input_ids": batch["caption_input_ids"].to(device),
+                "attention_mask": batch["caption_attention_mask"].to(device),
             }
             with torch.no_grad():
-                text_feat = model.encode_text(caption)
+                text_feat = model.encode_text(caption_input)
             qids.append(pid.view(-1))  # flatten
             qfeats.append(text_feat)
         qids = torch.cat(qids, 0)

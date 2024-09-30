@@ -5,23 +5,15 @@ from utils.iotools import read_json
 from .bases import BaseDataset
 
 
-class RSTPReid(BaseDataset):
+class VN3K_EN(BaseDataset):
     """
-    RSTPReid
-
-    Reference:
-    DSSL: Deep Surroundings-person Separation Learning for Text-based Person Retrieval MM 21
-
-    URL: http://arxiv.org/abs/2109.05534
-
-    Dataset statistics:
-    # identities: 4101
+    # identities: 6302
     """
 
-    dataset_dir = "RSTPReid"
+    dataset_dir = "VN3K"
 
     def __init__(self, root="", verbose=True):
-        super(RSTPReid, self).__init__()
+        super(VN3K_EN, self).__init__()
         self.dataset_dir = op.join(root, self.dataset_dir)
         self.img_dir = op.join(self.dataset_dir, "imgs/")
 
@@ -39,7 +31,7 @@ class RSTPReid(BaseDataset):
         self.val, self.val_id_container = self._process_anno(self.val_annos)
 
         if verbose:
-            self.logger.info("=> RSTPReid Images and Captions are loaded")
+            self.logger.info("=> VN3K_EN Images and Captions are loaded")
             self.show_dataset_info()
 
     def _split_anno(self, anno_path: str):
@@ -50,7 +42,7 @@ class RSTPReid(BaseDataset):
                 train_annos.append(anno)
             elif anno["split"] == "test":
                 test_annos.append(anno)
-            else:
+            elif anno["split"] == "validate":
                 val_annos.append(anno)
         return train_annos, test_annos, val_annos
 
@@ -60,10 +52,10 @@ class RSTPReid(BaseDataset):
             dataset = []
             image_id = 0
             for anno in annos:
-                pid = int(anno["id"])
+                pid = int(anno["id"]) - 1
                 pid_container.add(pid)
-                img_path = op.join(self.img_dir, anno["img_path"])
-                captions = anno["captions"]  # caption list
+                img_path = op.join(self.img_dir, anno["file_path"])
+                captions = anno["en_captions"]
                 for caption in captions:
                     dataset.append((pid, image_id, img_path, caption))
                 image_id += 1
@@ -72,26 +64,29 @@ class RSTPReid(BaseDataset):
                 assert idx == pid, f"idx: {idx} and pid: {pid} are not match"
             return dataset, pid_container
         else:
-            dataset = {}
+            dataset = {}  # type: ignore
             img_paths = []
             captions = []
             image_pids = []
             caption_pids = []
             for anno in annos:
-                pid = int(anno["id"])
+                pid = int(anno["id"]) - 1
                 pid_container.add(pid)
-                img_path = op.join(self.img_dir, anno["img_path"])
+                img_path = op.join(self.img_dir, anno["file_path"])
                 img_paths.append(img_path)
                 image_pids.append(pid)
-                caption_list = anno["captions"]  # caption list
+                caption_list = anno["en_captions"]
                 for caption in caption_list:
                     captions.append(caption)
                     caption_pids.append(pid)
+            # Return None if the dataset is empty
+            if not image_pids and not caption_pids and not img_paths and not captions:
+                return None, None
             dataset = {
-                "image_pids": image_pids,
-                "img_paths": img_paths,
-                "caption_pids": caption_pids,
-                "captions": captions,
+                "image_pids": image_pids,  # type: ignore
+                "img_paths": img_paths,  # type: ignore
+                "caption_pids": caption_pids,  # type: ignore
+                "captions": captions,  # type: ignore
             }
             return dataset, pid_container
 

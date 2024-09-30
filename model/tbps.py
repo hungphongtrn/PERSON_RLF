@@ -147,10 +147,10 @@ class TBPS(nn.Module):
             if return_last_hidden:
                 return pooler_output, last_hidden
 
-        x = self.backbone.visual_projection(pooler_output)
+        pooler_output = self.backbone.visual_projection(pooler_output)
         if return_last_hidden:
             last_hidden = self.backbone.visual_projection(last_hidden)
-            return x, last_hidden
+            return pooler_output, last_hidden
 
         return pooler_output
 
@@ -172,10 +172,10 @@ class TBPS(nn.Module):
             if return_last_hidden:
                 return pooler_output, last_hidden
 
-        x = self.backbone.text_projection(pooler_output)
+        pooler_output = self.backbone.text_projection(pooler_output)
         if return_last_hidden:
             last_hidden = self.backbone.text_projection(last_hidden)
-            return x, last_hidden
+            return pooler_output, last_hidden
 
         return pooler_output
 
@@ -210,7 +210,7 @@ class TBPS(nn.Module):
         # Improve data efficiency with SimCLR
         if self.config.experiment.get("SS", None):
             ss_images1_embed = self.simclr_mlp(self.encode_image(batch["ss_images1"]))
-            ss_images2_embed = self.simclr_mlp(self.encode_image(batch["ss_images1"]))
+            ss_images2_embed = self.simclr_mlp(self.encode_image(batch["ss_images2"]))
             ss_loss = (
                 objectives.compute_simclr(
                     ss_images1_embed,
@@ -235,7 +235,7 @@ class TBPS(nn.Module):
                 image_features_stopped=image_pooler_output_stopped,
                 text_features_stopped=caption_pooler_output_stopped,
                 sim_targets=sim_targets,
-                alpha=self.config.experiment.nitc_alpha,
+                alpha=alpha,
                 logit_scale=logit_scale,
             )
             if self.config.experiment.get("MVS", None):

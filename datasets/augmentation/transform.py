@@ -51,8 +51,8 @@ def get_self_supervised_augmentation(img_size):
     return aug
 
 
-def build_image_augmentation_pool(
-    augment_cfg: dict = None,
+def get_image_transform(
+    aug_pool,
     size: Tuple[int, int] = (384, 128),
     k: int = 2,
     is_train: bool = True,
@@ -73,52 +73,69 @@ def build_image_augmentation_pool(
         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
     )
     image_aug = [transforms.Resize(size), transforms.ToTensor()]
-    if is_train:
-        if augment_cfg:
-            for aug_type, aug_params in augment_cfg.items():
-                aug = parse_module_str(aug_type)(**aug_params)
-                image_aug.append(aug)
+    if is_train and aug_pool:
+        if k == -1:
+            k = len(aug_pool)
 
-            aug_choice = np.random.choice(image_aug, k)
-            # Extend image_aug with aug_choice
-            image_aug.extend(aug_choice)
+        aug_choice = np.random.choice(aug_pool, k)
+        # Extend image_aug with aug_choice
+        image_aug.extend(aug_choice)
 
     # augment_cfg will not be used for testing
     image_aug.append(normalize)
 
-    if is_train:
-        logger.info(f"Using image augmentation: {image_aug} for training.")
-
     return transforms.Compose(image_aug)
 
 
-def build_text_augmentation_pool(
-    augment_cfg: dict = None, k: int = 1, is_train: bool = True
+def build_image_aug_pool(augment_cfg: dict = None):
+    if augment_cfg:
+        additional_aug = []
+        for aug_type, aug_params in augment_cfg.items():
+            aug = parse_module_str(aug_type)(**aug_params)
+            additional_aug.append(aug)
+        logger.info(f"Using image augmentation: {additional_aug} for training.")
+        return additional_aug
+
+    return None
+
+
+def get_text_transform(
+    aug_pool,
+    k: int = 1,
+    is_train: bool = True,
 ) -> Callable:
     """
     Build a pool of text augmentation functions.
 
     Args:
-        augment_cfg: A dictionary of text augmentation functions.
+        aug_pool: A list of text augmentation functions.
         k: The number of augmentation functions to apply.
         is_train: Whether the augmentation is for training.
-        If is not for training, no augmentation will be applied.
+        If not for training, no augmentation will be applied.
     Returns:
         A callable that applies a random selection of text augmentation functions.
-        or None if no augmentation is specified
     """
-    # If not training or no augmentation is specified, return identity function
-    if not is_train or not augment_cfg:
-        return None
+    if is_train and aug_pool:
+        text_aug = []
+        if k == -1:
+            k = len(aug_pool)
 
-    text_aug_choices = []
+        aug_choice = np.random.choice(aug_pool, k)
+        text_aug.extend(aug_choice)
 
-    for aug_type, aug_params in augment_cfg.items():
-        aug = parse_module_str(aug_type)(**aug_params)
-        text_aug_choices.append(aug)
+    if text_aug:
+        return lambda x: reduce(lambda x, f: f(x), text_aug, x)
+    else:
+        return lambda x: x  # Identity function if no augmentations
 
-    aug_choice = np.random.choice(text_aug_choices, k)
-    logger.info(f"Using text augmentation: {aug_choice} for training.")
 
-    # Return a function to apply the augmentation iteratively
-    return lambda x: reduce(lambda x, f: f(x), aug_choice, x)
+def build_text_aug_pool(augment_cfg: dict = None):
+    if augment_cfg:
+        additional_aug = []
+        for aug_type, aug_params in augment_cfg.items():
+            aug = parse_module_str(aug_type)(**aug_params)
+            additional_aug.append(aug)
+        logger.info(f"Using text augmentation: {additional_aug} for training.")
+        return additional_aug
+
+    return None

@@ -1,11 +1,16 @@
 import logging
-from typing import Tuple, Optional, Callable
+from typing import Tuple, Optional, Callable, List
 
+import torch
 from prettytable import PrettyTable
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer
-import torch
 
+from .augmentation.transform import (
+    get_self_supervised_augmentation,
+    get_image_transform,
+    get_text_transform,
+)
 from utils.iotools import read_image
 
 logger = logging.getLogger(__name__)
@@ -55,10 +60,14 @@ class PreloadedDataset(Dataset):
         self,
         dataset,
         tokenizer: Optional[PreTrainedTokenizer] = None,
-        image_transform: Optional[Callable] = None,
-        ss_image_transform: Optional[Callable] = None,
-        text_transform: Optional[Callable] = None,
+        ss_aug: bool = False,
+        image_augmentation_pool: List[Callable] = None,
+        text_augmentation_pool: List[Callable] = None,
+        image_random_k: int = 2,
+        text_random_k: int = 2,
         truncate: bool = True,
+        image_size: Tuple[int, int] = (384, 128),
+        is_train: bool = True,
     ):
         """
         Base class for all datasets that are preloaded into memory
@@ -67,35 +76,55 @@ class PreloadedDataset(Dataset):
         Args:
             dataset: list, list of data samples
             tokenizer: Optional[PreTrainedTokenizer], tokenizer object
-            image_transform: Optional[Callable], image transformation function
-            ss_image_transform: Optional[Callable], self-supervised image transformation function
-            text_transform: Optional[Callable], text transformation function
+            ss_aug: bool, whether to apply self-supervised augmentation
+            image_augmentation_pool: List[Callable], list of image augmentation functions
+            text_augmentation_pool: List[Callable], list of text augmentation functions
+            image_random_k: int, number of augmentation functions to apply for image
+            text_random_k: int, number of augmentation functions to apply for text
+            -1 means apply all augmentation functions
             truncate: bool, truncate text to max length
+            image_size: Tuple[int, int], image size
+            is_train: bool, whether the dataset is for training
         """
         self.dataset = dataset
         self.tokenizer = tokenizer
-        self.image_transform = image_transform
-        self.ss_image_transform = ss_image_transform
-        self.text_transform = text_transform
+        self.ss_aug = ss_aug
+        self.image_augmentation_pool = image_augmentation_pool
+        self.text_augmentation_pool = text_augmentation_pool
+        self.image_random_k = image_random_k
+        self.text_random_k = text_random_k
         self.truncate = truncate
+        self.image_size = image_size
+        self.is_train = is_train
+
+        if self.ss_aug:
+            self.ss_image_transform = get_self_supervised_augmentation(self.image_size)
 
     def __len__(self):
         return len(self.dataset)
 
     def apply_image_transform(self, img):
-        if self.image_transform:
-            img = self.image_transform(img)
-        return img
+        current_img_transforms = get_image_transform(
+            aug_pool=self.image_augmentation_pool,
+            size=self.image_size,
+            k=self.image_random_k,
+            is_train=self.is_train,
+        )
+        augmented_img = current_img_transforms(img)
+        return augmented_img
 
     def apply_text_transform(self, caption):
-        if self.text_transform:
-            caption = self.text_transform(caption)
+        current_text_transforms = get_text_transform(
+            aug_pool=self.text_augmentation_pool,
+            k=self.text_random_k,
+            is_train=self.is_train,
+        )
+        caption = current_text_transforms(caption)
         return caption
 
     def apply_ss_image_transform(self, img):
-        if self.ss_image_transform:
-            img = self.ss_image_transform(img)
-        return img
+        augmented_img = self.ss_image_transform(img)
+        return augmented_img
 
     def tokenize(
         self,
@@ -123,10 +152,15 @@ class ImageTextDataset(PreloadedDataset):
         Args:
             dataset: list, list of data samples
             tokenizer: Optional[PreTrainedTokenizer], tokenizer object
-            image_transform: Optional[Callable], image transformation function
-            ss_image_transform: Optional[Callable], self-supervised image transformation function
-            text_transform: Optional[Callable], text transformation function
+            ss_aug: bool, whether to apply self-supervised augmentation
+            image_augmentation_pool: List[Callable], list of image augmentation functions
+            text_augmentation_pool: List[Callable], list of text augmentation functions
+            image_random_k: int, number of augmentation functions to apply for image
+            text_random_k: int, number of augmentation functions to apply for text
+            -1 means apply all augmentation functions
             truncate: bool, truncate text to max length
+            image_size: Tuple[int, int], image size
+            is_train: bool, whether the dataset is for training
         """
         super().__init__(*args, **kwargs)
 
@@ -154,7 +188,7 @@ class ImageTextDataset(PreloadedDataset):
         for key, value in tokens.items():
             ret[f"caption_{key}"] = value
 
-        if self.ss_image_transform:
+        if self.ss_aug:
             # Apply self-supervised augmentation if available
             ss_aug1 = self.apply_ss_image_transform(original_img)
             ss_aug2 = self.apply_ss_image_transform(original_img)
@@ -177,8 +211,15 @@ class ImageDataset(PreloadedDataset):
         Args:
             dataset: list, list of data samples
             tokenizer: Optional[PreTrainedTokenizer], tokenizer object
-            image_transform: Optional[Callable], image transformation function
+            ss_aug: bool, whether to apply self-supervised augmentation
+            image_augmentation_pool: List[Callable], list of image augmentation functions
+            text_augmentation_pool: List[Callable], list of text augmentation functions
+            image_random_k: int, number of augmentation functions to apply for image
+            text_random_k: int, number of augmentation functions to apply for text
+            -1 means apply all augmentation functions
             truncate: bool, truncate text to max length
+            image_size: Tuple[int, int], image size
+            is_train: bool, whether the dataset is for training
         """
         super().__init__(*args, **kwargs)
 
@@ -209,8 +250,15 @@ class TextDataset(PreloadedDataset):
         Args:
             dataset: list, list of data samples
             tokenizer: Optional[PreTrainedTokenizer], tokenizer object
-            text_transform: Optional[Callable], text transformation function
+            ss_aug: bool, whether to apply self-supervised augmentation
+            image_augmentation_pool: List[Callable], list of image augmentation functions
+            text_augmentation_pool: List[Callable], list of text augmentation functions
+            image_random_k: int, number of augmentation functions to apply for image
+            text_random_k: int, number of augmentation functions to apply for text
+            -1 means apply all augmentation functions
             truncate: bool, truncate text to max length
+            image_size: Tuple[int, int], image size
+            is_train: bool, whether the dataset is for training
         """
         super().__init__(*args, **kwargs)
 
@@ -247,9 +295,15 @@ class ImageTextMLMDataset(PreloadedDataset):
         Args:
             dataset: list, list of data samples
             tokenizer: Optional[PreTrainedTokenizer], tokenizer object
-            image_transform: Optional[Callable], image transformation function
-            text_transform: Optional[Callable], text transformation function
+            ss_aug: bool, whether to apply self-supervised augmentation
+            image_augmentation_pool: List[Callable], list of image augmentation functions
+            text_augmentation_pool: List[Callable], list of text augmentation functions
+            image_random_k: int, number of augmentation functions to apply for image
+            text_random_k: int, number of augmentation functions to apply for text
+            -1 means apply all augmentation functions
             truncate: bool, truncate text to max length
+            image_size: Tuple[int, int], image size
+            is_train: bool, whether the dataset is for training
         """
         super().__init__(*args, **kwargs)
         self.mlm_probability = mlm_probability
@@ -288,7 +342,7 @@ class ImageTextMLMDataset(PreloadedDataset):
         for key, value in inputs.items():
             ret[f"mlm_{key}"] = value
 
-        if self.ss_image_transform:
+        if self.ss_aug:
             # Apply self-supervised augmentation if available
             ss_aug1 = self.apply_ss_image_transform(original_img)
             ss_aug2 = self.apply_ss_image_transform(original_img)

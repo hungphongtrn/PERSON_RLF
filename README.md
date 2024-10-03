@@ -28,6 +28,10 @@ python prepare_checkpoints.py
 ```
 
 ## Logs
+- 3/10/24:
+    - Fixed all issues with dataset loader. Flexibly control the augmentaion and training experiments
+        - Potential improvements: Split each part of the experiments into separate config files -> Use Hydra to manage the config files
+    - NaN Loss in RITC and SS
 
 - 13/9/24:
     - NaN loss is caused by `RuntimeError: Function 'SoftmaxBackward0' returned nan values in its 0th output.` in `attn_weights = nn.functional.softmax`.

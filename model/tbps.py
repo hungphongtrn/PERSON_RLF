@@ -10,7 +10,7 @@ from model.layers import Transformer, QuickGELU, LayerNorm
 
 logger = logging.getLogger(__name__)
 
-TASK_LIST = ["ITC", "SDM", "CMPM", "ID", "MLM", "SS"]
+TASK_LIST = ["ITC", "SDM", "CMPM", "ID", "MLM", "SS", "MVS", "RITC", "CITC", "NITC"]
 
 
 class TBPS(nn.Module):
@@ -271,6 +271,10 @@ class TBPS(nn.Module):
 
         # Compute RITC loss
         if self.config.experiment.get("RITC", None):
+            sim_targets = torch.eq(
+                batch["pids"].view(-1, 1), batch["pids"].view(1, -1)
+            ).float()
+            sim_targets /= sim_targets.sum(dim=1, keepdim=True)
             loss = objectives.compute_ritc(
                 image_pooler_output,
                 caption_pooler_output,

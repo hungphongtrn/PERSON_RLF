@@ -5,11 +5,7 @@ import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader
 
-from datasets.augmentation.transform import (
-    build_image_augmentation_pool,
-    build_text_augmentation_pool,
-    get_self_supervised_augmentation,
-)
+from datasets.augmentation.transform import build_image_aug_pool, build_text_aug_pool
 from datasets.bases import (
     ImageDataset,
     ImageTextDataset,
@@ -55,31 +51,18 @@ class TBPSDataModule(pl.LightningDataModule):
         self.num_classes = len(self.dataset.train_id_container)
         self.collate_fn = collate
         # Set up transforms
-        self._prepare_transforms()
+        self._prepare_augmentation_pool()
 
-    def _prepare_transforms(self):
-        if self.config.experiment.aug.img.pop("ss_aug"):
-            self.ss_image_transform = get_self_supervised_augmentation(
-                self.config.experiment.aug.img.size
-            )
-        else:
-            self.ss_image_transform = None
-
-        # Image augmentation can't be None; at minium, contain Resize, ToTensor, and Normalize
-        self.image_transform = build_image_augmentation_pool(
-            **self.config.experiment.aug.img, is_train=True
+    def _prepare_augmentation_pool(self):
+        self.image_aug_pool = build_image_aug_pool(
+            self.config.experiment.aug.img.augment_cfg
         )
-        self.test_image_transforms = build_image_augmentation_pool(
-            **self.config.experiment.aug.img, is_train=False
+        self.text_aug_pool = build_text_aug_pool(
+            self.config.experiment.aug.text.augment_cfg
         )
-
-        # Text augmentaion can be None, in which case, no augmentation is applied
-        self.text_transform = build_text_augmentation_pool(
-            **self.config.experiment.aug.text, is_train=True
-        )
-        self.test_text_transforms = build_text_augmentation_pool(
-            **self.config.experiment.aug.text, is_train=False
-        )
+        self.image_random_k = self.config.experiment.aug.image_random_k
+        self.text_random_k = self.config.experiment.aug.text_random_k
+        self.ss_aug = self.config.experiment.SS
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
@@ -87,40 +70,48 @@ class TBPSDataModule(pl.LightningDataModule):
                 self.train_set = ImageTextMLMDataset(
                     dataset=self.dataset.train,
                     tokenizer=self.tokenizer,
-                    image_transform=self.image_transform,
-                    ss_image_transform=self.ss_image_transform,
-                    text_transform=self.text_transform,
+                    ss_aug=self.ss_aug,
+                    image_augmentation_pool=self.image_aug_pool,
+                    text_augmentation_pool=self.text_aug_pool,
+                    image_random_k=self.image_random_k,
+                    text_random_k=self.text_random_k,
+                    truncate=True,
+                    image_size=self.config.experiment.aug.img.size,
+                    is_train=True,
                 )
             else:
                 self.train_set = ImageTextDataset(
                     dataset=self.dataset.train,
                     tokenizer=self.tokenizer,
-                    image_transform=self.image_transform,
-                    ss_image_transform=self.ss_image_transform,
-                    text_transform=self.text_transform,
+                    ss_aug=self.ss_aug,
+                    image_augmentation_pool=self.image_aug_pool,
+                    text_augmentation_pool=self.text_aug_pool,
+                    image_random_k=self.image_random_k,
+                    text_random_k=self.text_random_k,
+                    truncate=True,
+                    image_size=self.config.experiment.aug.img.size,
+                    is_train=True,
                 )
 
             if self.dataset.val:
                 logger.info("Validation set is available")
                 self.val_img_set = ImageDataset(
-                    dataset=self.dataset.val,
-                    image_transform=self.test_image_transforms,
+                    dataset=self.dataset.train,
+                    is_train=False,
                 )
                 self.val_txt_set = TextDataset(
-                    dataset=self.dataset.val,
+                    dataset=self.dataset.train,
                     tokenizer=self.tokenizer,
-                    text_transform=self.test_text_transforms,
+                    is_train=False,
                 )
 
         if stage == "test" or stage is None:
             self.test_img_set = ImageDataset(
-                dataset=self.dataset.test,
-                image_transform=self.test_image_transforms,
+                dataset=self.dataset.train,
             )
             self.test_txt_set = TextDataset(
-                dataset=self.dataset.test,
+                dataset=self.dataset.train,
                 tokenizer=self.tokenizer,
-                text_transform=self.test_text_transforms,
             )
 
     def train_dataloader(self):

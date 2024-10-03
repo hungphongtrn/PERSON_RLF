@@ -226,9 +226,9 @@ def compute_ritc(image_features, text_features, logit_scale, sim_targets, eps=1e
     prob_t2i = F.log_softmax(sim_t2i, dim=1)
 
     target_prob = (sim_targets + eps).log()
-    kl_i2t = F.kl_div(prob_i2t, target_prob, reduction="batchmean")
-    kl_t2i = F.kl_div(prob_t2i, target_prob, reduction="batchmean")
-    loss = (kl_i2t + kl_t2i) / 2
+    kl_img = F.kl_div(target_prob, prob_i2t, log_target=True, reduction="batchmean")
+    kl_txt = F.kl_div(target_prob, prob_t2i, log_target=True, reduction="batchmean")
+    loss = (kl_img + kl_txt) / 2
     return loss
 
 
@@ -300,7 +300,7 @@ def compute_simclr(
     sim_ab = (image_features_1 @ image_features_2.t()) / temperature
     sim_ba = sim_ab.t()
 
-    mask = torch.eye(batch_size, device=device) * float("-inf")
+    mask = torch.where(F.one_hot(labels, batch_size) == 0, 0, float("-inf"))
     # Similarity between the first augmented image and other augmented images in the batch
     sim_aa = (image_features_1 @ image_features_1.t()) / temperature + mask
     sim_bb = (image_features_2 @ image_features_2.t()) / temperature + mask

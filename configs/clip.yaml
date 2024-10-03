@@ -12,7 +12,7 @@ experiment:
   dataset_name: VN3K_EN
 
   text_length: &model_max_length 77
-  batch_size: 24
+  batch_size: 16
   sampler: random
   test_batch_size: 64
   num_instance: 1
@@ -31,11 +31,11 @@ experiment:
   ss_loss_weight: 0.4
 
   # Masked language modeling loss
-  MLM: false
+  MLM: true
   mlm_loss_weight: 1.0
   cmt_depth: 4
 
-  ID: false
+  ID: true
   id_loss_weight: 1.0
 
   SDM: true
@@ -51,10 +51,10 @@ experiment:
   citc_loss_weight: 0.1
 
   aug:
+    image_random_k: 2
+    text_random_k: -1
     img:
-      ss_aug: true
       size: *size
-      k: 2 # number of augmentations to randomly select from; -1 means all in order
       augment_cfg:
         torchvision.transforms.ColorJitter:
           brightness: 0.1
@@ -75,7 +75,6 @@ experiment:
         torchvision.transforms.RandomErasing:
           scale: ${tuple:0.10, 0.20}
     text:
-      k: 2 # number of augmentations to randomly select from; -1 means all in order
       augment_cfg:
         datasets.augmentation.text_transform.random_deletion:
           p: 0.05
@@ -86,15 +85,15 @@ experiment:
     max_epochs: &max_epoch 5
     precision: bf16-mixed
     # accumulate_grad_batches: 1
-    accelerator: cpu
+    accelerator: gpu
     gradient_clip_val: 1.0
     gradient_clip_algorithm: value
     log_every_n_steps: 1
-    detect_anomaly: true
+    detect_anomaly: false
     enable_progress_bar: true
     enable_model_summary: true
     enable_checkpointing: true
-    fast_dev_run: 4
+    # fast_dev_run: 4
 
 # Optimizer
 optimizer:
@@ -129,7 +128,7 @@ scheduler:
 tokenizer:
   type: model.clip.tokenization_clip.CLIPTokenizer
   vocab_size: &vocab_size 49409
-  pretrained_model_name_or_path: /home/phongtnh/Person-Search/person_rlf/clip_checkpoints
+  pretrained_model_name_or_path: ./clip_checkpoints
   model_max_length: *model_max_length
 
 # Backbone

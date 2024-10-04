@@ -96,21 +96,21 @@ class TBPSDataModule(pl.LightningDataModule):
             if self.dataset.val:
                 logger.info("Validation set is available")
                 self.val_img_set = ImageDataset(
-                    dataset=self.dataset.train,
+                    dataset=self.dataset.val,
                     is_train=False,
                 )
                 self.val_txt_set = TextDataset(
-                    dataset=self.dataset.train,
+                    dataset=self.dataset.val,
                     tokenizer=self.tokenizer,
                     is_train=False,
                 )
 
         if stage == "test" or stage is None:
             self.test_img_set = ImageDataset(
-                dataset=self.dataset.train,
+                dataset=self.dataset.test,
             )
             self.test_txt_set = TextDataset(
-                dataset=self.dataset.train,
+                dataset=self.dataset.test,
                 tokenizer=self.tokenizer,
             )
 

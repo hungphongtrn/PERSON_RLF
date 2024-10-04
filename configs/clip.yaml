@@ -7,13 +7,13 @@ distributed: false
 experiment:
   ckpt_path:
   # version: optimizer_effect_check_AdamW8bit_hf_cosine_scheduler
-  version: test_run
+  version: no_grad_clipping_full_version_few_shot_identiy_sampler
   # Dataset
   dataset_name: VN3K_EN
 
   text_length: &model_max_length 77
   batch_size: 16
-  sampler: random
+  sampler: identity
   test_batch_size: 64
   num_instance: 1
   num_workers: 4
@@ -31,14 +31,14 @@ experiment:
   ss_loss_weight: 0.4
 
   # Masked language modeling loss
-  MLM: true
+  MLM: false
   mlm_loss_weight: 1.0
   cmt_depth: 4
 
-  ID: true
+  ID: false
   id_loss_weight: 1.0
 
-  SDM: true
+  SDM: false
   sdm_loss_weight: 1.0
 
   RITC: true
@@ -86,8 +86,8 @@ experiment:
     precision: bf16-mixed
     # accumulate_grad_batches: 1
     accelerator: gpu
-    gradient_clip_val: 1.0
-    gradient_clip_algorithm: value
+    # gradient_clip_val: 1.0
+    # gradient_clip_algorithm: value
     log_every_n_steps: 1
     detect_anomaly: false
     enable_progress_bar: true
@@ -108,28 +108,27 @@ optimizer:
   eps: 1.0e-8
 
 # Scheduler
-# scheduler:
-#   type: solver.lr_scheduler.LRSchedulerWithWarmup
-#   milestones: [3]  # ignored in cosine mode
-#   gamma: 0.1  # ignored in cosine mode
-#   warmup_factor: 0.1
-#   warmup_epochs: 1
-#   warmup_method: linear
-#   total_epochs: *max_epoch
-#   mode: cosine
-#   target_lr: 0.0
-#   power: 0.9
 scheduler:
-  type: transformers.optimization.get_cosine_schedule_with_warmup
-  num_warmup_steps: 359
-  num_training_steps: 1795
+  type: solver.lr_scheduler.LRSchedulerWithWarmup
+  mode: cosine
+  warmup_epochs: 1
+  warmup_method: linear
+  total_epochs: *max_epoch
+  start_lr: 1.0e-6
+  end_lr: 5.0e-6
+  
+# scheduler:
+#   type: transformers.optimization.get_cosine_schedule_with_warmup
+#   num_warmup_steps: 538
+#   num_training_steps: 2690
 
 # Tokenizer
 tokenizer:
   type: model.clip.tokenization_clip.CLIPTokenizer
-  vocab_size: &vocab_size 49409
+  vocab_size: &vocab_size 49408
   pretrained_model_name_or_path: ./clip_checkpoints
   model_max_length: *model_max_length
+  add_mask_token: false
 
 # Backbone
 backbone:

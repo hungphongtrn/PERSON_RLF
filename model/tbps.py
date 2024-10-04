@@ -97,7 +97,7 @@ class TBPS(nn.Module):
             nn.init.normal_(self.mlm_head.dense.weight, std=fc_std)
             nn.init.normal_(self.mlm_head.fc.weight, std=proj_std)
 
-    def _build_mlp(self, in_dim=512, mlp_dim=512, out_dim=512):
+    def _build_mlp(self, in_dim=512, mlp_dim=128, out_dim=512):
         return nn.Sequential(
             nn.Linear(in_dim, mlp_dim),
             nn.ReLU(inplace=True),

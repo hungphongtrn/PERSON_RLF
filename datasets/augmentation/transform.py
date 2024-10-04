@@ -88,8 +88,8 @@ def get_image_transform(
 
 
 def build_image_aug_pool(augment_cfg: dict = None):
+    additional_aug = []
     if augment_cfg:
-        additional_aug = []
         for aug_type, aug_params in augment_cfg.items():
             aug = parse_module_str(aug_type)(**aug_params)
             additional_aug.append(aug)
@@ -115,8 +115,8 @@ def get_text_transform(
     Returns:
         A callable that applies a random selection of text augmentation functions.
     """
+    text_aug = []
     if is_train and aug_pool:
-        text_aug = []
         if k == -1:
             k = len(aug_pool)
 

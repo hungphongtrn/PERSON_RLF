@@ -1,5 +1,3 @@
-import logging
-
 import lightning as L
 import torch
 from lightning.pytorch.utilities import grad_norm
@@ -64,6 +62,7 @@ class LitTBPS(L.LightningModule):
 
     def configure_optimizers(self):
         optimizer = build_optimizer(self.config.optimizer, self.model)
+        self.config.scheduler.n_iter_per_epoch = self.train_loader_size
         scheduler = build_lr_scheduler(self.config.scheduler, optimizer)
         return {
             "optimizer": optimizer,

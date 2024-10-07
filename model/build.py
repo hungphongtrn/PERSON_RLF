@@ -26,19 +26,24 @@ def build_backbone_with_proper_layer_resize(backbone_cfg):
         model (nn.Module): Backbone model with proper layer resizing.
     """
     # Extract configuration
-    backbone_type = backbone_cfg.pop("type")
+    modifiable_backbone_cfg = backbone_cfg.copy()
+    backbone_type = modifiable_backbone_cfg.pop("type")
     logger.info(f"Building backbone model: {backbone_type}")
-    
-    checkpoint_path = backbone_cfg.pop("path")
-    num_visual_vertical_patches = backbone_cfg.pop("num_visual_vertical_patches")
-    num_visual_horizontal_patches = backbone_cfg.pop("num_visual_horizontal_patches")
-    original_model_include_cls_token = backbone_cfg.pop(
+
+    checkpoint_path = modifiable_backbone_cfg.pop("path")
+    num_visual_vertical_patches = modifiable_backbone_cfg.pop(
+        "num_visual_vertical_patches"
+    )
+    num_visual_horizontal_patches = modifiable_backbone_cfg.pop(
+        "num_visual_horizontal_patches"
+    )
+    original_model_include_cls_token = modifiable_backbone_cfg.pop(
         "original_model_include_cls_token"
     )
-    config_type = backbone_cfg.pop("config_type")
+    config_type = modifiable_backbone_cfg.pop("config_type")
 
     # Parse configuration into Config object
-    config = parse_module_str(config_type)(**backbone_cfg)
+    config = parse_module_str(config_type)(**modifiable_backbone_cfg)
 
     # Load the model state dict
     if checkpoint_path.split(".")[-1] == "bin":
@@ -74,7 +79,9 @@ def build_backbone_with_proper_layer_resize(backbone_cfg):
     logger.info(
         f"Name of position embeddings for text model: {text_model_position_embedding}"
     )
-    logger.info(f"Name of token embeddings for text model: {text_model_token_embedding}")
+    logger.info(
+        f"Name of token embeddings for text model: {text_model_token_embedding}"
+    )
     logger.info(
         f"Name of position embeddings for image model: {image_model_position_embedding}"
     )

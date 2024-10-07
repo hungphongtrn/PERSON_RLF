@@ -14,8 +14,9 @@ class LitTBPS(L.LightningModule):
         config,
         img_loader,
         text_loader,
-        tokenizer,
-        train_loader_size,
+        vocab_size,
+        pad_token_id,
+        num_iters_per_epoch,
         num_classes=11003,
     ):
         super().__init__()
@@ -26,11 +27,12 @@ class LitTBPS(L.LightningModule):
         self.model = TBPS(
             config=config,
             backbone=self.backbone,
-            tokenizer=tokenizer,
+            vocab_size=vocab_size,
+            pad_token_id=pad_token_id,
             num_classes=num_classes,
         )
         self.evaluator = Evaluator(img_loader, text_loader)
-        self.train_loader_size = train_loader_size
+        self.num_iters_per_epoch = num_iters_per_epoch
 
     def training_step(self, batch, batch_idx):
         # Get the current epoch
@@ -38,7 +40,7 @@ class LitTBPS(L.LightningModule):
         step = self.trainer.global_step
         alpha = self.config.experiment.softlabel_ratio
         if epoch == 0:
-            alpha *= min(1.0, step / self.train_loader_size)
+            alpha *= min(1.0, step / self.num_iters_per_epoch)
 
         ret = self.model(batch, alpha)
         loss = sum([ret[k] for k in ret if k.endswith("loss")])
@@ -62,7 +64,7 @@ class LitTBPS(L.LightningModule):
 
     def configure_optimizers(self):
         optimizer = build_optimizer(self.config.optimizer, self.model)
-        self.config.scheduler.n_iter_per_epoch = self.train_loader_size
+        self.config.scheduler.n_iter_per_epoch = self.num_iters_per_epoch
         scheduler = build_lr_scheduler(self.config.scheduler, optimizer)
         return {
             "optimizer": optimizer,

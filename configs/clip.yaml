@@ -7,7 +7,7 @@ distributed: false
 experiment:
   ckpt_path:
   # version: optimizer_effect_check_AdamW8bit_hf_cosine_scheduler
-  version: no_grad_clipping_full_version_few_shot_identiy_sampler
+  version: no_grad_clipping_full_version_few_shot_identiy_sampler_add_start_lr_end_lr
   # Dataset
   dataset_name: VN3K_EN
 
@@ -116,7 +116,7 @@ scheduler:
   total_epochs: *max_epoch
   start_lr: 1.0e-6
   end_lr: 5.0e-6
-  
+
 # scheduler:
 #   type: transformers.optimization.get_cosine_schedule_with_warmup
 #   num_warmup_steps: 538

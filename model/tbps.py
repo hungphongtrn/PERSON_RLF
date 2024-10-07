@@ -14,11 +14,13 @@ TASK_LIST = ["ITC", "SDM", "CMPM", "ID", "MLM", "SS", "MVS", "RITC", "CITC", "NI
 
 
 class TBPS(nn.Module):
-    def __init__(self, config, backbone, tokenizer, num_classes=11003):
+    def __init__(self, config, backbone, vocab_size, pad_token_id, num_classes=11003):
         super().__init__()
         self.config = config
         self.num_classes = num_classes
-        self.tokenizer = tokenizer
+        # self.tokenizer = tokenizer
+        self.vocab_size = vocab_size
+        self.pad_token_id = pad_token_id
 
         self.backbone = backbone
         self.vision_model = backbone.vision_model
@@ -88,7 +90,7 @@ class TBPS(nn.Module):
                         ("ln", LayerNorm(self.embed_dim)),
                         (
                             "fc",
-                            nn.Linear(self.embed_dim, self.tokenizer.true_vocab_size),
+                            nn.Linear(self.embed_dim, self.vocab_size),
                         ),
                     ]
                 )
@@ -361,19 +363,19 @@ class TBPS(nn.Module):
 
             x = self.mlm_head(x)
 
-            scores = x.reshape(-1, self.tokenizer.true_vocab_size)
+            scores = x.reshape(-1, self.vocab_size)
             mlm_labels = mlm_labels.reshape(-1)  # [batch_size * text_len]
             ret.update(
                 {
                     "mlm_loss": objectives.compute_mlm(
-                        scores, mlm_labels, self.tokenizer.pad_token_id
+                        scores, mlm_labels, self.pad_token_id
                     )
                     * self.config.experiment.mlm_loss_weight
                 }
             )
 
             pred = scores.max(1)[1]
-            mlm_label_idx = torch.nonzero(mlm_labels != self.tokenizer.pad_token_id)
+            mlm_label_idx = torch.nonzero(mlm_labels != self.pad_token_id)
 
             acc = (pred[mlm_label_idx] == mlm_labels[mlm_label_idx]).float().mean()
             ret.update({"mlm_acc": acc})

@@ -15,12 +15,13 @@ def build_optimizer(optimizer_cfg, model):
     Returns:
         optimizer: optimizer
     """
+    modifiable_optimizer_cfg = optimizer_cfg.copy()
     # Create parameter groups and set learning rate for each group
-    lr = optimizer_cfg.pop("lr")
-    lr_factor = optimizer_cfg.pop("lr_factor")
-    bias_lr_factor = optimizer_cfg.pop("bias_lr_factor")
-    weight_decay = optimizer_cfg.pop("weight_decay")
-    weight_decay_bias = optimizer_cfg.pop("weight_decay_bias")
+    lr = modifiable_optimizer_cfg.pop("lr")
+    lr_factor = modifiable_optimizer_cfg.pop("lr_factor")
+    bias_lr_factor = modifiable_optimizer_cfg.pop("bias_lr_factor")
+    weight_decay = modifiable_optimizer_cfg.pop("weight_decay")
+    weight_decay_bias = modifiable_optimizer_cfg.pop("weight_decay_bias")
 
     param_groups = {
         "default": {
@@ -66,10 +67,10 @@ def build_optimizer(optimizer_cfg, model):
     param_groups = [group for group in param_groups.values() if group["params"]]
 
     # Create optimizer
-    optimizer_type = optimizer_cfg.pop("type")
+    optimizer_type = modifiable_optimizer_cfg.pop("type")
     logger.info(f"Using {optimizer_type} optimizer")
     optimizer_cls = parse_module_str(optimizer_type)
-    optimizer = optimizer_cls(param_groups, **optimizer_cfg)
+    optimizer = optimizer_cls(param_groups, **modifiable_optimizer_cfg)
 
     # if optimizer_cfg.optimizer == "SGD":
     #     optimizer = torch.optim.SGD(param_groups, momentum=optimizer_cfg.momentum)
@@ -116,10 +117,12 @@ def build_lr_scheduler(scheduler_cfg, optimizer):
     Returns:
         scheduler: learning rate scheduler
     """
-
-    scheduler_type = scheduler_cfg.pop("type")
+    modifiable_scheduler_cfg = scheduler_cfg.copy()
+    scheduler_type = modifiable_scheduler_cfg.pop("type")
     logger.info(f"Using {scheduler_type} scheduler.")
-    lr_scheduler = parse_module_str(scheduler_type)(optimizer, **scheduler_cfg)
+    lr_scheduler = parse_module_str(scheduler_type)(
+        optimizer, **modifiable_scheduler_cfg
+    )
     return lr_scheduler
 
 

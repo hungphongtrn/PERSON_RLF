@@ -35,6 +35,8 @@ def run(config_path: str):
     dm = TBPSDataModule(config)
     dm.setup()
 
+    tokenizer = dm.tokenizer
+
     # Log an example of the dataset
     logging.info(f"Example of the dataset: {dm.train_set[0]}")
 
@@ -58,11 +60,10 @@ def run(config_path: str):
     # Preparing the model
     model = LitTBPS(
         config,
-        img_loader=test_loader[0],
-        text_loader=test_loader[1],
-        tokenizer=dm.tokenizer,
+        vocab_size=tokenizer.true_vocab_size,
+        pad_token_id=tokenizer.pad_token_id,
+        num_iters_per_epoch=len(train_loader),
         num_classes=dm.num_classes,
-        train_loader_size=len(train_loader),
     )
 
     # Preparing the monitors
@@ -85,10 +86,15 @@ def run(config_path: str):
 
     if config.get("ckpt_path", None):
         logging.info(f"Resuming from checkpoint: {config.experiment.ckpt_path}")
-        trainer.fit(model, train_dataloaders=train_loader, ckpt_path=config.ckpt_path)
+        trainer.fit(
+            model,
+            train_dataloaders=train_loader,
+            val_dataloaders=test_loader,
+            ckpt_path=config.ckpt_path,
+        )
     else:
         logging.info("Starting training from scratch")
-        trainer.fit(model, train_dataloaders=train_loader)
+        trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=test_loader)
 
 
 if __name__ == "__main__":

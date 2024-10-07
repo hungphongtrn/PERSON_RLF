@@ -1,19 +1,25 @@
+import logging
+
 import lightning as L
 import torch
 from lightning.pytorch.utilities import grad_norm
+from prettytable import PrettyTable
 
 from model.build import build_backbone_with_proper_layer_resize
 from model.tbps import TBPS
 from solver import build_lr_scheduler, build_optimizer
-from utils.metrics import Evaluator
+from utils.metrics import rank
+
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
 
 
 class LitTBPS(L.LightningModule):
     def __init__(
         self,
         config,
-        img_loader,
-        text_loader,
         vocab_size,
         pad_token_id,
         num_iters_per_epoch,
@@ -31,8 +37,13 @@ class LitTBPS(L.LightningModule):
             pad_token_id=pad_token_id,
             num_classes=num_classes,
         )
-        self.evaluator = Evaluator(img_loader, text_loader)
         self.num_iters_per_epoch = num_iters_per_epoch
+        self.validation_step_outputs = {
+            "text_ids": [],
+            "image_ids": [],
+            "text_feats": [],
+            "image_feats": [],
+        }
 
     def training_step(self, batch, batch_idx):
         # Get the current epoch
@@ -52,15 +63,77 @@ class LitTBPS(L.LightningModule):
 
         return loss
 
-    def on_train_epoch_end(self):
-        # Run the evaluator on the entire dataset
-        with torch.no_grad():
-            eval_score = self.evaluator.eval(self.model)
-        # eval_score = self.evaluator.eval(self.model)
-        torch.cuda.empty_cache()
-        # Log evaluator results
-        self.log("eval_score", eval_score)
-        return eval_score
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+        # dataloader_idx = 0 for image, 1 for text
+        if dataloader_idx == 0:
+            pid = batch["pids"]
+            img = batch["images"]
+            img_feat = self.model.encode_image(img)
+            self.validation_step_outputs["image_ids"].append(pid.view(-1))  # flatten
+            self.validation_step_outputs["image_feats"].append(img_feat)
+
+        if dataloader_idx == 1:
+            pid = batch["pids"]
+            caption_input = {
+                "input_ids": batch["caption_input_ids"],
+                "attention_mask": batch["caption_attention_mask"],
+            }
+            text_feat = self.model.encode_text(caption_input)
+            self.validation_step_outputs["text_ids"].append(pid.view(-1))  # flatten
+            self.validation_step_outputs["text_feats"].append(text_feat)
+
+    def on_validation_epoch_end(self):
+        image_ids = torch.cat(self.validation_step_outputs["image_ids"], 0)
+        image_feats = torch.cat(self.validation_step_outputs["image_feats"], 0)
+        text_ids = torch.cat(self.validation_step_outputs["text_ids"], 0)
+        text_feats = torch.cat(self.validation_step_outputs["text_feats"], 0)
+
+        similarity = text_feats @ image_feats.t()
+
+        t2i_cmc, t2i_mAP, t2i_mINP, _ = rank(
+            similarity=similarity,
+            q_pids=text_ids,
+            g_pids=image_ids,
+            max_rank=10,
+            get_mAP=True,
+        )
+        t2i_cmc, t2i_mAP, t2i_mINP = (
+            t2i_cmc.tolist(),
+            t2i_mAP.tolist(),
+            t2i_mINP.tolist(),
+        )
+        table = PrettyTable(["task", "R1", "R5", "R10", "mAP", "mINP"])
+        table.add_row(["t2i", t2i_cmc[0], t2i_cmc[4], t2i_cmc[9], t2i_mAP, t2i_mINP])
+
+        i2t_cmc, i2t_mAP, i2t_mINP, _ = rank(
+            similarity=similarity.t(),
+            q_pids=text_ids,
+            g_pids=image_ids,
+            max_rank=10,
+            get_mAP=True,
+        )
+        i2t_cmc, i2t_mAP, i2t_mINP = (
+            i2t_cmc.tolist(),
+            i2t_mAP.tolist(),
+            i2t_mINP.tolist(),
+        )
+        table.add_row(["i2t", i2t_cmc[0], i2t_cmc[4], i2t_cmc[9], i2t_mAP, i2t_mINP])
+
+        results = {
+            "t2i_R1": t2i_cmc[0],
+            "t2i_R5": t2i_cmc[4],
+            "t2i_R10": t2i_cmc[9],
+            "t2i_mAP": t2i_mAP,
+            "t2i_mINP": t2i_mINP,
+            "i2t_R1": i2t_cmc[0],
+            "i2t_R5": i2t_cmc[4],
+            "i2t_R10": i2t_cmc[9],
+            "i2t_mAP": i2t_mAP,
+            "i2t_mINP": i2t_mINP,
+        }
+
+        self.log_dict(results, on_step=False, on_epoch=True, prog_bar=False)
+        logging.info("\n" + str(table))
 
     def configure_optimizers(self):
         optimizer = build_optimizer(self.config.optimizer, self.model)

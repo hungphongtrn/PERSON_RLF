@@ -135,6 +135,14 @@ class LitTBPS(L.LightningModule):
         self.log_dict(results, on_step=False, on_epoch=True, prog_bar=False)
         logging.info("\n" + str(table))
 
+        # Reset the outputs
+        self.validation_step_outputs = {
+            "text_ids": [],
+            "image_ids": [],
+            "text_feats": [],
+            "image_feats": [],
+        }
+
     def configure_optimizers(self):
         optimizer = build_optimizer(self.config.optimizer, self.model)
         self.config.scheduler.n_iter_per_epoch = self.num_iters_per_epoch

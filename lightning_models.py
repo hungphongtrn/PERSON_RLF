@@ -27,7 +27,7 @@ class LitTBPS(L.LightningModule):
     ):
         super().__init__()
         self.config = config
-        self.save_hyperparameters(config)
+        self.save_hyperparameters()
 
         self.backbone = build_backbone_with_proper_layer_resize(self.config.backbone)
         self.model = TBPS(
@@ -63,30 +63,38 @@ class LitTBPS(L.LightningModule):
 
         return loss
 
-    def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        # dataloader_idx = 0 for image, 1 for text
-        if dataloader_idx == 0:
-            pid = batch["pids"]
-            img = batch["images"]
+    def validation_step(self, batch, batch_idx):
+        if batch["img"]:
+            pid = batch["img"]["pids"]
+            img = batch["img"]["images"]
             img_feat = self.model.encode_image(img)
             self.validation_step_outputs["image_ids"].append(pid.view(-1))  # flatten
             self.validation_step_outputs["image_feats"].append(img_feat)
 
-        if dataloader_idx == 1:
-            pid = batch["pids"]
+        if batch["txt"]:
+            pid = batch["txt"]["pids"]
             caption_input = {
-                "input_ids": batch["caption_input_ids"],
-                "attention_mask": batch["caption_attention_mask"],
+                "input_ids": batch["txt"]["caption_input_ids"],
+                "attention_mask": batch["txt"]["caption_attention_mask"],
             }
             text_feat = self.model.encode_text(caption_input)
             self.validation_step_outputs["text_ids"].append(pid.view(-1))  # flatten
             self.validation_step_outputs["text_feats"].append(text_feat)
 
     def on_validation_epoch_end(self):
+        logging.info("Validation epoch end")
+        table = PrettyTable(["task", "R1", "R5", "R10", "mAP", "mINP"])
+
         image_ids = torch.cat(self.validation_step_outputs["image_ids"], 0)
         image_feats = torch.cat(self.validation_step_outputs["image_feats"], 0)
         text_ids = torch.cat(self.validation_step_outputs["text_ids"], 0)
         text_feats = torch.cat(self.validation_step_outputs["text_feats"], 0)
+
+        # Logging statistics of the validation set
+        logging.info(f"Image ids: {image_ids.size()}")
+        logging.info(f"Text ids: {text_ids.size()}")
+        logging.info(f"Image feats: {image_feats.size()}")
+        logging.info(f"Text feats: {text_feats.size()}")
 
         similarity = text_feats @ image_feats.t()
 
@@ -102,13 +110,12 @@ class LitTBPS(L.LightningModule):
             t2i_mAP.tolist(),
             t2i_mINP.tolist(),
         )
-        table = PrettyTable(["task", "R1", "R5", "R10", "mAP", "mINP"])
         table.add_row(["t2i", t2i_cmc[0], t2i_cmc[4], t2i_cmc[9], t2i_mAP, t2i_mINP])
 
         i2t_cmc, i2t_mAP, i2t_mINP, _ = rank(
             similarity=similarity.t(),
-            q_pids=text_ids,
-            g_pids=image_ids,
+            q_pids=image_ids,
+            g_pids=text_ids,
             max_rank=10,
             get_mAP=True,
         )
@@ -133,6 +140,9 @@ class LitTBPS(L.LightningModule):
         }
 
         self.log_dict(results, on_step=False, on_epoch=True, prog_bar=False)
+        self.log(
+            "eval_score", results["t2i_R1"], on_step=False, on_epoch=True, prog_bar=True
+        )
         logging.info("\n" + str(table))
 
         # Reset the outputs

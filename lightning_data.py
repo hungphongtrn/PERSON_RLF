@@ -3,6 +3,7 @@ import warnings
 
 import pytorch_lightning as pl
 import torch
+from lightning.pytorch.utilities import CombinedLoader
 from torch.utils.data import DataLoader
 
 from datasets.augmentation.transform import build_image_aug_pool, build_text_aug_pool
@@ -12,7 +13,6 @@ from datasets.bases import (
     ImageTextMLMDataset,
     TextDataset,
 )
-from datasets.build import collate
 from datasets.cuhkpedes import CUHKPEDES
 from datasets.icfgpedes import ICFGPEDES
 from datasets.rstpreid import RSTPReid
@@ -49,7 +49,6 @@ class TBPSDataModule(pl.LightningDataModule):
         )
         self.tokenizer = get_tokenizer(config.tokenizer)
         self.num_classes = len(self.dataset.train_id_container)
-        self.collate_fn = collate
         # Set up transforms
         self._prepare_augmentation_pool()
 
@@ -132,7 +131,8 @@ class TBPSDataModule(pl.LightningDataModule):
                     self.train_set,
                     batch_sampler=batch_sampler,
                     num_workers=self.config.experiment.num_workers,
-                    collate_fn=self.collate_fn,
+                    # collate_fn=self.collate_fn,
+                    drop_last=False,
                 )
             else:
                 logger.info(
@@ -147,7 +147,8 @@ class TBPSDataModule(pl.LightningDataModule):
                         self.config.experiment.num_instance,
                     ),
                     num_workers=self.config.experiment.num_workers,
-                    collate_fn=self.collate_fn,
+                    # collate_fn=self.collate_fn,
+                    drop_last=False,
                 )
         elif self.config.experiment.sampler == "random":
             logger.info("using random sampler")
@@ -156,7 +157,8 @@ class TBPSDataModule(pl.LightningDataModule):
                 batch_size=self.config.experiment.batch_size,
                 shuffle=True,
                 num_workers=self.config.experiment.num_workers,
-                collate_fn=self.collate_fn,
+                # collate_fn=self.collate_fn,
+                drop_last=True,
             )
         else:
             logger.error(
@@ -189,14 +191,19 @@ class TBPSDataModule(pl.LightningDataModule):
             self.test_img_set,
             batch_size=self.config.experiment.test_batch_size,
             shuffle=False,
-            num_workers=self.config.experiment.num_workers,
-            collate_fn=self.collate_fn,
+            num_workers=0,
+            # collate_fn=self.collate_fn,
         )
         test_txt_loader = DataLoader(
             self.test_txt_set,
             batch_size=self.config.experiment.test_batch_size,
             shuffle=False,
-            num_workers=self.config.experiment.num_workers,
-            collate_fn=self.collate_fn,
+            num_workers=0,
+            # collate_fn=self.collate_fn,
         )
-        return [test_img_loader, test_txt_loader]
+        combined_test = {
+            "img": test_img_loader,
+            "txt": test_txt_loader,
+        }
+        combined_loader = CombinedLoader(combined_test, mode="max_size")
+        return combined_loader

@@ -31,6 +31,12 @@ def run(config_path: str):
     config = OmegaConf.load(config_path)
     version = config.experiment.pop("version")
 
+    # Config modification if use MLM
+    if config.get("experiment.use_mlm", False):
+        config.tokenizer.vocab_size += 1
+        config.tokenizer.add_mask_token = True
+        config.backbone.text_config.vocab_size = config.tokenizer.vocab_size
+
     # Loading the data module
     dm = TBPSDataModule(config)
     dm.setup()
@@ -83,6 +89,9 @@ def run(config_path: str):
         logger=board_logger,
         **trainer_args,
     )
+    logging.info(f"Test loader length: {len(iter(test_loader))}")
+
+    trainer.validate(model, test_loader)
 
     if config.get("ckpt_path", None):
         logging.info(f"Resuming from checkpoint: {config.experiment.ckpt_path}")

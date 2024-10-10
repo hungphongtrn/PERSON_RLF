@@ -6,8 +6,8 @@ distributed: false
 # Experiment config
 experiment:
   ckpt_path:
-  # version: optimizer_effect_check_AdamW8bit_hf_cosine_scheduler
-  version: no_grad_clipping_full_version_few_shot_identiy_sampler_add_start_lr_end_lr
+  version: rep_vn3k_en_grad_clipping_identity_sampler
+  # version: code_testing
   # Dataset
   dataset_name: VN3K_EN
 
@@ -16,7 +16,7 @@ experiment:
   sampler: identity
   test_batch_size: 64
   num_instance: 1
-  num_workers: 4
+  num_workers: 2
 
   # Main contrastive loss
   NITC: true
@@ -81,19 +81,22 @@ experiment:
 
   # Train
   trainer:
-    default_root_dir: /mnt/data/user_data/phongtnh/person_search/person_rlf/logs
+    default_root_dir: ./logs
     max_epochs: &max_epoch 5
     precision: bf16-mixed
-    # accumulate_grad_batches: 1
+    accumulate_grad_batches: 1
     accelerator: gpu
-    # gradient_clip_val: 1.0
-    # gradient_clip_algorithm: value
+    gradient_clip_val: 1.0
+    gradient_clip_algorithm: value
     log_every_n_steps: 1
     detect_anomaly: false
     enable_progress_bar: true
     enable_model_summary: true
     enable_checkpointing: true
-    # fast_dev_run: 4
+    # fast_dev_run: 16
+    num_sanity_val_steps: 0
+    # check_val_every_n_epoch: 1
+    # overfit_batches: 10
 
 # Optimizer
 optimizer:

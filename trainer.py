@@ -35,7 +35,7 @@ def run(config: DictConfig) -> None:
     version = config.get("version", None)
 
     # Modify the config if use MLM
-    if config.get("loss.use_mlm", False):
+    if config.loss.MLM:
         config.tokenizer.vocab_size += 1
         config.tokenizer.add_mask_token = True
         config.backbone.text_config.vocab_size = config.tokenizer.vocab_size

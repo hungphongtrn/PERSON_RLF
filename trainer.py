@@ -1,15 +1,15 @@
 import logging
 
+import hydra
 import lightning as L
 from lightning.pytorch import seed_everything
 from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
 from lightning.pytorch.loggers import TensorBoardLogger
-from omegaconf import OmegaConf
-from fire import Fire
-# from prettytable import PrettyTable
+from omegaconf import OmegaConf, DictConfig
 
 from lightning_models import LitTBPS
 from lightning_data import TBPSDataModule
+
 
 # Setting up the loggeer
 logging.basicConfig(
@@ -25,19 +25,22 @@ def resolve_tuple(*args):
 OmegaConf.register_new_resolver("tuple", resolve_tuple)
 
 
-def run(config_path: str):
-    # Loading the configuration file
-    seed_everything(42)
-    config = OmegaConf.load(config_path)
-    version = config.experiment.pop("version")
+@hydra.main(version_base=None, config_path="config", config_name="config")
+def run(config: DictConfig) -> None:
+    OmegaConf.set_struct(config, False)
+    # Set the seed
+    seed_everything(config.seed)
 
-    # Config modification if use MLM
-    if config.get("experiment.use_mlm", False):
+    # Get the version
+    version = config.get("version", None)
+
+    # Modify the config if use MLM
+    if config.get("loss.use_mlm", False):
         config.tokenizer.vocab_size += 1
         config.tokenizer.add_mask_token = True
         config.backbone.text_config.vocab_size = config.tokenizer.vocab_size
 
-    # Loading the data module
+    # Load the data module
     dm = TBPSDataModule(config)
     dm.setup()
 
@@ -52,7 +55,7 @@ def run(config_path: str):
 
     # Experiment name
     model_short_name = config.backbone.type.split(".")[-1]
-    experiment_name = config.experiment.dataset_name + "_" + model_short_name
+    experiment_name = config.dataset.dataset_name + "_" + model_short_name
 
     # Preparing Checkpoint Callback
     checkpoint_callback = ModelCheckpoint(
@@ -74,14 +77,14 @@ def run(config_path: str):
 
     # Preparing the monitors
     board_logger = TensorBoardLogger(
-        save_dir=config.experiment.trainer.default_root_dir,
+        save_dir=config.trainer.default_root_dir,
         version=version,
         name=experiment_name,
     )
     lr_monitor = LearningRateMonitor(logging_interval="step")
 
     # Preparing the trainer
-    trainer_args = config.experiment.trainer
+    trainer_args = config.trainer
     logging.info(f"Trainer Args: {trainer_args}")
     logging.info(f"CE Loss ignored tokens: {dm.tokenizer.pad_token_id}")
     trainer = L.Trainer(
@@ -94,7 +97,7 @@ def run(config_path: str):
     trainer.validate(model, test_loader)
 
     if config.get("ckpt_path", None):
-        logging.info(f"Resuming from checkpoint: {config.experiment.ckpt_path}")
+        logging.info(f"Resuming from checkpoint: {config.trainer.ckpt_path}")
         trainer.fit(
             model,
             train_dataloaders=train_loader,
@@ -107,4 +110,4 @@ def run(config_path: str):
 
 
 if __name__ == "__main__":
-    Fire(run)
+    run()

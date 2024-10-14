@@ -2,10 +2,11 @@ siglip_checkpoints
 # ignore all __pycache__ directories regardless of position in the tree
 **/__pycache__
 VN3K
-logs
+logs/
 tb_logs
 CUHK-PEDES
 clip_checkpoints
 .*
 notebooks
 *.ipynb
+outputs

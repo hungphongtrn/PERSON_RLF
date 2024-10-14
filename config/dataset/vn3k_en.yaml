@@ -1,0 +1,7 @@
+dataset_name: VN3K_EN
+text_length: ${tokenizer.model_max_length}
+batch_size: 16
+sampler: identity
+test_batch_size: 64
+num_instance: 1
+num_workers: 2

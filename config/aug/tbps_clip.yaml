@@ -1,0 +1,6 @@
+defaults:
+    - img: tbps_clip.yaml
+    - text: tbps_clip.yaml
+
+image_random_k: 2
+text_random_k: -1

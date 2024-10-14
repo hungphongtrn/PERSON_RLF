@@ -35,7 +35,7 @@ class TBPS(nn.Module):
         task_lists = []
         for task in TASK_LIST:
             try:
-                if config.experiment.get(task, None):
+                if config.loss.get(task, None):
                     task_lists.append(task)
             except AttributeError:
                 pass
@@ -44,23 +44,23 @@ class TBPS(nn.Module):
         self.contain_visual_projection, self.contain_text_projection = (
             self.check_contain_projection()
         )
-        if config.experiment.get("SS", None):
+        if config.loss.get("SS", None):
             self.simclr_mlp = self._build_mlp(
                 self.embed_dim, self.embed_dim, self.embed_dim
             )
 
-        if config.experiment.get("ID", None):
+        if config.loss.get("ID", None):
             self.classifier = nn.Linear(self.embed_dim, self.num_classes)
             nn.init.normal_(self.classifier.weight.data, std=0.001)
             nn.init.constant_(self.classifier.bias.data, val=0.0)
 
-        if config.experiment.get("MLM", None):
+        if config.loss.get("MLM", None):
             self.cross_attn = nn.MultiheadAttention(
                 self.embed_dim, self.embed_dim // 64, batch_first=True
             )
             self.cross_modal_transformer = Transformer(
                 width=self.embed_dim,
-                layers=config.experiment.get("cmt_depth", 4),
+                layers=config.loss.get("cmt_depth", 4),
                 heads=self.embed_dim // 64,
             )
             scale = self.cross_modal_transformer.width**-0.5
@@ -201,7 +201,7 @@ class TBPS(nn.Module):
         logit_scale = self.logit_scale.exp()
         logit_scale.data = torch.clamp(logit_scale.data, max=100)
 
-        if self.config.experiment.get("MLM", None):
+        if self.config.loss.get("MLM", None):
             image_pooler_output, image_last_hidden = self.encode_image(images, True)
         else:
             image_pooler_output = self.encode_image(images)
@@ -210,21 +210,21 @@ class TBPS(nn.Module):
         ret.update({"temperature": 1 / logit_scale})
 
         # Improve data efficiency with SimCLR
-        if self.config.experiment.get("SS", None):
+        if self.config.loss.get("SS", None):
             ss_images1_embed = self.simclr_mlp(self.encode_image(batch["ss_images1"]))
             ss_images2_embed = self.simclr_mlp(self.encode_image(batch["ss_images2"]))
             ss_loss = (
                 objectives.compute_simclr(
                     ss_images1_embed,
                     ss_images2_embed,
-                    self.config.experiment.simclr_temperature,
+                    self.config.loss.simclr_temperature,
                 )
-                * self.config.experiment.ss_loss_weight
+                * self.config.loss.ss_loss_weight
             )
             ret.update({"ss_loss": ss_loss})
 
         # Compute NITC loss
-        if self.config.experiment.get("NITC", None):
+        if self.config.loss.get("NITC", None):
             sim_targets = torch.eq(
                 batch["pids"].view(-1, 1), batch["pids"].view(1, -1)
             ).float()
@@ -240,7 +240,7 @@ class TBPS(nn.Module):
                 alpha=alpha,
                 logit_scale=logit_scale,
             )
-            if self.config.experiment.get("MVS", None):
+            if self.config.loss.get("MVS", None):
                 aug_images = batch["aug_images"]
                 aug_images_features = self.encode_image(aug_images)
                 aug_images_features_stopped = aug_images_features.clone().detach()
@@ -257,22 +257,22 @@ class TBPS(nn.Module):
                 nitc_loss = (nitc_loss + augmented_nitc_loss) / 2
 
             ret.update(
-                {"nitc_loss": nitc_loss * self.config.experiment.nitc_loss_weight}
+                {"nitc_loss": nitc_loss * self.config.loss.nitc_loss_weight}
             )
 
         # Compute CITC loss
-        if self.config.experiment.get("CITC", None):
+        if self.config.loss.get("CITC", None):
             loss = objectives.compute_citc(
                 image_pooler_output,
                 caption_pooler_output,
                 logit_scale,
-                self.config.experiment.citc_inmodal_weight,
-                self.config.experiment.citc_intermodal_weight,
+                self.config.loss.citc_inmodal_weight,
+                self.config.loss.citc_intermodal_weight,
             )
-            ret.update({"citc_loss": loss * self.config.experiment.citc_loss_weight})
+            ret.update({"citc_loss": loss * self.config.loss.citc_loss_weight})
 
         # Compute RITC loss
-        if self.config.experiment.get("RITC", None):
+        if self.config.loss.get("RITC", None):
             sim_targets = torch.eq(
                 batch["pids"].view(-1, 1), batch["pids"].view(1, -1)
             ).float()
@@ -282,25 +282,25 @@ class TBPS(nn.Module):
                 caption_pooler_output,
                 logit_scale,
                 sim_targets,
-                self.config.experiment.ritc_eps,
+                self.config.loss.ritc_eps,
             )
-            ret.update({"ritc_loss": loss * self.config.experiment.ritc_loss_weight})
+            ret.update({"ritc_loss": loss * self.config.loss.ritc_loss_weight})
 
         # Compute ITC loss
-        if self.config.experiment.get("ITC", None):
+        if self.config.loss.get("ITC", None):
             ret.update(
                 {
                     "itc_loss": (
                         objectives.compute_itc(
                             image_pooler_output, caption_pooler_output, logit_scale
                         )
-                        * self.config.experiment.itc_loss_weight
+                        * self.config.loss.itc_loss_weight
                     )
                 }
             )
 
         # Compute MLM loss
-        if self.config.experiment.get("SDM", None):
+        if self.config.loss.get("SDM", None):
             ret.update(
                 {
                     "sdm_loss": (
@@ -310,33 +310,33 @@ class TBPS(nn.Module):
                             batch["pids"],
                             logit_scale,
                         )
-                        * self.config.experiment.sdm_loss_weight
+                        * self.config.loss.sdm_loss_weight
                     )
                 }
             )
 
         # Compute CMPM loss
-        if self.config.experiment.get("CMPM", None):
+        if self.config.loss.get("CMPM", None):
             ret.update(
                 {
                     "cmpm_loss": (
                         objectives.compute_cmpm(
                             image_pooler_output, caption_pooler_output, batch["pids"]
                         )
-                        * self.config.experiment.cmpm_loss_weight
+                        * self.config.loss.cmpm_loss_weight
                     )
                 }
             )
 
         # Compute ID loss
-        if self.config.experiment.get("ID", None):
+        if self.config.loss.get("ID", None):
             image_logits = self.classifier(image_pooler_output).float()
             text_logits = self.classifier(caption_pooler_output).float()
             ret.update(
                 {
                     "id_loss": (
                         objectives.compute_id(image_logits, text_logits, batch["pids"])
-                        * self.config.experiment.id_loss_weight
+                        * self.config.loss.id_loss_weight
                     )
                 }
             )
@@ -350,7 +350,7 @@ class TBPS(nn.Module):
             ret.update({"txt_acc": text_precision})
 
         # Compute MLM loss
-        if self.config.experiment.get("MLM", None):
+        if self.config.loss.get("MLM", None):
             mlm_input = {
                 "input_ids": batch["mlm_input_ids"],
                 "attention_mask": batch["mlm_attention_mask"],
@@ -370,7 +370,7 @@ class TBPS(nn.Module):
                     "mlm_loss": objectives.compute_mlm(
                         scores, mlm_labels, self.pad_token_id
                     )
-                    * self.config.experiment.mlm_loss_weight
+                    * self.config.loss.mlm_loss_weight
                 }
             )
 

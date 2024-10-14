@@ -1,0 +1,14 @@
+type: model.clip.modeling_clip.CLIPModel
+path: clip_checkpoints/pytorch_model.bin
+config_type: model.clip.configuration_clip.CLIPConfig
+original_model_include_cls_token: true
+text_config:
+  vocab_size: ${tokenizer.vocab_size}
+  max_position_embeddings: ${tokenizer.model_max_length}
+  attention_dropout: 0.05
+vision_config:
+  image_size: ${img_size}
+  patch_size: 16
+num_visual_horizontal_patches: 8
+num_visual_vertical_patches: 24
+embedding_dim: 512

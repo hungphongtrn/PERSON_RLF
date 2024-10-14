@@ -1,0 +1,5 @@
+type: model.clip.tokenization_clip.CLIPTokenizer
+pretrained_model_name_or_path: ./clip_checkpoints
+vocab_size: 49408
+model_max_length: 77
+add_mask_token: false

@@ -13,15 +13,17 @@ def get_tokenizer(tokenizer_args: dict) -> PreTrainedTokenizer:
     Returns:
         tokenizer: PreTrainedTokenizer, tokenizer object
     """
-
-    tokenizer_type = tokenizer_args.pop("type")
-    vocab_size = tokenizer_args.pop("vocab_size")
-    add_mask_token = tokenizer_args.pop("add_mask_token", False)
+    modifiable_tokenizer_args = tokenizer_args.copy()
+    tokenizer_type = modifiable_tokenizer_args.pop("type")
+    vocab_size = modifiable_tokenizer_args.pop("vocab_size")
+    add_mask_token = modifiable_tokenizer_args.pop("add_mask_token", False)
 
     if not vocab_size:
         raise ValueError("vocab_size is required for tokenizer")
 
-    tokenizer = parse_module_str(tokenizer_type).from_pretrained(**tokenizer_args)
+    tokenizer = parse_module_str(tokenizer_type).from_pretrained(
+        **modifiable_tokenizer_args
+    )
 
     if add_mask_token:
         tokenizer.add_special_tokens({"mask_token": "<|mask|>"})

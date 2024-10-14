@@ -3,12 +3,8 @@ dataset_root_dir: .
 img_size: &size ${tuple:384, 128}
 distributed: false
 
-# Experiment config
-experiment:
-  ckpt_path:
-  version: rep_vn3k_en_grad_clipping_identity_sampler
-  # version: code_testing
-  # Dataset
+# Dataset
+dataset:
   dataset_name: VN3K_EN
 
   text_length: &model_max_length 77
@@ -18,6 +14,8 @@ experiment:
   num_instance: 1
   num_workers: 2
 
+# Loss
+loss:
   # Main contrastive loss
   NITC: true
   nitc_loss_weight: 1.0
@@ -50,53 +48,55 @@ experiment:
   citc_intermodal_weight: 0.25
   citc_loss_weight: 0.1
 
-  aug:
-    image_random_k: 2
-    text_random_k: -1
-    img:
-      size: *size
-      augment_cfg:
-        torchvision.transforms.ColorJitter:
-          brightness: 0.1
-          contrast: 0.1
-          saturation: 0.1
-          hue: 0
-        torchvision.transforms.RandomRotation:
-          degrees: 15
-        torchvision.transforms.RandomResizedCrop:
-          size: *size
-          scale: ${tuple:0.9, 1.0}
-          # ratio: [0.75, 1.3333333333333333]
-          antialias: true
-        torchvision.transforms.RandomGrayscale:
-          p: 0.1
-        torchvision.transforms.RandomHorizontalFlip:
-          p: 0.5
-        torchvision.transforms.RandomErasing:
-          scale: ${tuple:0.10, 0.20}
-    text:
-      augment_cfg:
-        datasets.augmentation.text_transform.random_deletion:
-          p: 0.05
+# Augmentation
+aug:
+  image_random_k: 2
+  text_random_k: -1
+  img:
+    size: *size
+    augment_cfg:
+      torchvision.transforms.ColorJitter:
+        brightness: 0.1
+        contrast: 0.1
+        saturation: 0.1
+        hue: 0
+      torchvision.transforms.RandomRotation:
+        degrees: 15
+      torchvision.transforms.RandomResizedCrop:
+        size: *size
+        scale: ${tuple:0.9, 1.0}
+        # ratio: [0.75, 1.3333333333333333]
+        antialias: true
+      torchvision.transforms.RandomGrayscale:
+        p: 0.1
+      torchvision.transforms.RandomHorizontalFlip:
+        p: 0.5
+      torchvision.transforms.RandomErasing:
+        scale: ${tuple:0.10, 0.20}
+  text:
+    augment_cfg:
+      datasets.augmentation.text_transform.random_deletion:
+        p: 0.05
 
-  # Train
-  trainer:
-    default_root_dir: ./logs
-    max_epochs: &max_epoch 5
-    precision: bf16-mixed
-    accumulate_grad_batches: 1
-    accelerator: gpu
-    gradient_clip_val: 1.0
-    gradient_clip_algorithm: value
-    log_every_n_steps: 1
-    detect_anomaly: false
-    enable_progress_bar: true
-    enable_model_summary: true
-    enable_checkpointing: true
-    # fast_dev_run: 16
-    num_sanity_val_steps: 0
-    # check_val_every_n_epoch: 1
-    # overfit_batches: 10
+# Trainer
+trainer:
+  ckpt_path:
+  default_root_dir: ./logs
+  max_epochs: &max_epoch 5
+  precision: bf16-mixed
+  accumulate_grad_batches: 1
+  accelerator: gpu
+  gradient_clip_val: 1.0
+  gradient_clip_algorithm: value
+  log_every_n_steps: 1
+  detect_anomaly: false
+  enable_progress_bar: true
+  enable_model_summary: true
+  enable_checkpointing: true
+  # fast_dev_run: 16
+  num_sanity_val_steps: 0
+  # check_val_every_n_epoch: 1
+  # overfit_batches: 10
 
 # Optimizer
 optimizer:

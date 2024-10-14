@@ -49,7 +49,7 @@ class LitTBPS(L.LightningModule):
         # Get the current epoch
         epoch = self.trainer.current_epoch
         step = self.trainer.global_step
-        alpha = self.config.experiment.softlabel_ratio
+        alpha = self.config.loss.softlabel_ratio
         if epoch == 0:
             alpha *= min(1.0, step / self.num_iters_per_epoch)
 

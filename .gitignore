@@ -10,3 +10,4 @@ clip_checkpoints
 notebooks
 *.ipynb
 outputs
+multirun

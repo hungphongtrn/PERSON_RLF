@@ -1,3 +1,4 @@
+import os
 import logging
 
 import hydra
@@ -33,6 +34,9 @@ def run(config: DictConfig) -> None:
 
     # Get the version
     version = config.get("version", None)
+    # Assert if the version already exists
+    if version == os.path.join(config.trainer.default_root_dir, version):
+        raise ValueError(f"Version {version} already exists")
 
     # Modify the config if use MLM
     if config.loss.MLM:

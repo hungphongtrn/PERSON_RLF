@@ -4,7 +4,7 @@ import warnings
 import pytorch_lightning as pl
 import torch
 from lightning.pytorch.utilities import CombinedLoader
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 
 from datasets.augmentation.transform import build_image_aug_pool, build_text_aug_pool
 from datasets.bases import (
@@ -86,6 +86,18 @@ class TBPSDataModule(pl.LightningDataModule):
                     truncate=True,
                     image_size=self.config.aug.img.size,
                     is_train=True,
+                )
+
+            if self.config.dataset.proportion:
+                self.train_set, _ = random_split(
+                    self.train_set,
+                    [
+                        self.config.dataset.proportion,
+                        1.0 - self.config.dataset.proportion,
+                    ],
+                )
+                logger.info(
+                    f"Using {self.config.dataset.proportion} of the training set"
                 )
 
             if self.dataset.val:

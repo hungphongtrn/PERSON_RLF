@@ -32,7 +32,7 @@ def get_config_overrides() -> Dict[str, Any]:
 def generate_experiment_name(config_name: str, overrides: Dict[str, Any]) -> str:
     """Generate experiment name based on config overrides."""
     if not overrides:
-        return "base"
+        return f"{config_name}_base"
 
     # Sort overrides for consistent naming
     override_parts = []
@@ -106,6 +106,8 @@ def setup_checkpoint_callback(
     overridden_config: str,
 ) -> ModelCheckpoint:
     """Set up checkpoint callback."""
+    if not overridden_config:
+        overridden_config = "base"
     checkpoint_path = os.path.join(log_dir, overridden_config, "checkpoints")
     logging.info(f"Checkpoint path: {checkpoint_path}")
     return ModelCheckpoint(

@@ -44,6 +44,8 @@ class LitTBPS(L.LightningModule):
             "text_feats": [],
             "image_feats": [],
         }
+        self.test_img_data = []
+        self.test_txt_data = []
 
     def training_step(self, batch, batch_idx):
         # Get the current epoch
@@ -90,11 +92,11 @@ class LitTBPS(L.LightningModule):
         text_ids = torch.cat(self.validation_step_outputs["text_ids"], 0)
         text_feats = torch.cat(self.validation_step_outputs["text_feats"], 0)
 
-        # Logging statistics of the validation set
-        logging.info(f"Image ids: {image_ids.size()}")
-        logging.info(f"Text ids: {text_ids.size()}")
-        logging.info(f"Image feats: {image_feats.size()}")
-        logging.info(f"Text feats: {text_feats.size()}")
+        # # Logging statistics of the validation set
+        # logging.info(f"Image ids: {image_ids.size()}")
+        # logging.info(f"Text ids: {text_ids.size()}")
+        # logging.info(f"Image feats: {image_feats.size()}")
+        # logging.info(f"Text feats: {text_feats.size()}")
 
         similarity = text_feats @ image_feats.t()
 
@@ -171,3 +173,84 @@ class LitTBPS(L.LightningModule):
         norms = grad_norm(self.model, norm_type=2)
         all_norms = norms[f"grad_{float(2)}_norm_total"]
         self.log("grad_norm", all_norms, on_step=True, on_epoch=True, prog_bar=True)
+
+    def test_step(self, batch, batch_idx, dataloader_idx):
+        # 0 is image, 1 is text
+        if dataloader_idx == 0:
+            pids = batch["pids"]
+            imgs = batch["images"]
+            self.test_img_data.extend(
+                [
+                    {k: v[i].to("cpu") for k, v in batch.items()}
+                    for i in range(len(batch["images"]))
+                ]
+            )
+            img_feat = self.model.encode_image(imgs)
+            self.validation_step_outputs["image_ids"].append(pids.view(-1))  # flatten
+            self.validation_step_outputs["image_feats"].append(img_feat)
+
+        elif dataloader_idx == 1:
+            pids = batch["pids"]
+            caption_inputs = {
+                "input_ids": batch["caption_input_ids"],
+                "attention_mask": batch["caption_attention_mask"],
+            }
+            self.test_txt_data.extend(
+                [
+                    {k: v[i].to("cpu") for k, v in batch.items()}
+                    for i in range(len(batch["caption_input_ids"]))
+                ]
+            )
+            text_feat = self.model.encode_text(caption_inputs)
+            self.validation_step_outputs["text_ids"].append(pids.view(-1))  # flatten
+            self.validation_step_outputs["text_feats"].append(text_feat)
+
+    def on_test_epoch_end(self):
+        image_ids = torch.cat(self.validation_step_outputs["image_ids"], 0)
+        image_feats = torch.cat(self.validation_step_outputs["image_feats"], 0)
+        text_ids = torch.cat(self.validation_step_outputs["text_ids"], 0)
+        text_feats = torch.cat(self.validation_step_outputs["text_feats"], 0)
+
+        similarity = text_feats @ image_feats.t()
+        _, _, _, indices = rank(
+            similarity=similarity,
+            q_pids=text_ids,
+            g_pids=image_ids,
+            max_rank=10,
+            get_mAP=True,
+        )
+        wrong_predictions = self._get_wrong_predictions(
+            indices, self.test_img_data, self.test_txt_data
+        )
+        del self.test_img_data, self.test_txt_data
+        self.test_final_outputs = wrong_predictions
+
+    def _get_wrong_predictions(self, indices, test_img_data, test_txt_data):
+        wrong_predictions = []
+
+        for query_id in range(indices.shape[0]):
+            true_person_ids = test_txt_data[query_id]["pids"]
+            predicted_image_ids = indices[query_id][:10]
+            predicted_person_ids = [
+                test_img_data[idx]["pids"].tolist() for idx in predicted_image_ids
+            ]
+
+            if predicted_person_ids[0] != true_person_ids:
+                row = {"query": test_txt_data[query_id]["caption_input_ids"]}
+                # Just store the tensors directly
+                for i, img_id in enumerate(predicted_image_ids):
+                    row[f"img_{i+1}"] = {
+                        "image": test_img_data[img_id]["images"],
+                        "pid": predicted_person_ids[i],
+                    }
+                # Find an image with the correct person id
+                for sample in test_img_data:
+                    if sample["pids"] == true_person_ids:
+                        row["correct_img"] = {
+                            "image": sample["images"],
+                            "pid": true_person_ids,
+                        }
+                        break
+                wrong_predictions.append(row)
+
+        return wrong_predictions

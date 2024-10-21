@@ -40,7 +40,7 @@ def rank(similarity, q_pids, g_pids, max_rank=10, get_mAP=True):
     AP = tmp_cmc.sum(1) / num_rel  # q
     mAP = AP.mean() * 100
 
-    return all_cmc, mAP, mINP, indices
+    return all_cmc, mAP, mINP, indices.cpu()
 
 
 class Evaluator:

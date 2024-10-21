@@ -88,8 +88,10 @@ class LRSchedulerWithWarmup(_LRScheduler):
 
             elif self.warmup_method == "linear":
                 alpha = current_iter / self.warmup_iters
+                warmup_factor = self.warmup_factor * (1 - alpha) + alpha
                 return [
-                    self.start_lr + alpha * (base_lr - self.start_lr)
+                    # self.start_lr + alpha * (base_lr - self.start_lr)
+                    self.start_lr + (base_lr - self.start_lr) * warmup_factor
                     for base_lr in self.base_lrs
                 ]
 

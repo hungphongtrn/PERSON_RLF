@@ -15,6 +15,9 @@ from utils.parse_module_str import parse_module_str
 
 logger = logging.getLogger(__name__)
 
+MEAN = [0.485, 0.456, 0.406]
+STD = [0.229, 0.224, 0.225]
+
 
 def get_self_supervised_augmentation(img_size):
     class GaussianBlur(object):
@@ -69,31 +72,50 @@ def get_image_transform(
     Returns:
         A callable that applies a random selection of image augmentation functions.
     """
-    normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+    EXCLUDING = [
+        "Resize",
+        "ToTensor",
+        "Normalize",
+    ]
+    if not is_train or not aug_pool:
+        normalize = transforms.Normalize(
+            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+        )
+        transform = transforms.Compose(
+            [transforms.Resize(size), transforms.ToTensor(), normalize]
+        )
+        return transform
+
+    if k == -1:
+        return transforms.Compose(aug_pool)
+
+    # Randomly select k augmentations from the pool excluding Resize, ToTensor, Normalize
+    aug_choice = np.random.choice(
+        [aug for aug in aug_pool if aug.__class__.__name__ not in EXCLUDING], k
     )
-    image_aug = [transforms.Resize(size), transforms.ToTensor()]
-    if is_train and aug_pool:
-        if k == -1:
-            k = len(aug_pool)
+    # Combine selected augmentations with Resize, ToTensor, Normalize, retaining the order
+    image_aug = [
+        aug
+        for aug in aug_pool
+        if aug in aug_choice or aug.__class__.__name__ in EXCLUDING
+    ]
 
-        aug_choice = np.random.choice(aug_pool, k)
-        # Extend image_aug with aug_choice
-        image_aug.extend(aug_choice)
-
-    # augment_cfg will not be used for testing
-    image_aug.append(normalize)
-
-    return transforms.Compose(image_aug)
+    transform = transforms.Compose(image_aug)
+    return transform
 
 
 def build_image_aug_pool(augment_cfg: dict = None):
     additional_aug = []
     if augment_cfg:
         for aug_type, aug_params in augment_cfg.items():
-            aug = parse_module_str(aug_type)(**aug_params)
+            try:
+                if aug_params:
+                    aug = parse_module_str(aug_type)(**aug_params)
+                else:
+                    aug = parse_module_str(aug_type)()
+            except TypeError as e:
+                raise TypeError(f"Augmentation {aug_type} requires parameters: {e}")
             additional_aug.append(aug)
-        logger.info(f"Using image augmentation: {additional_aug} for training.")
         return additional_aug
 
     return None

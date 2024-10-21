@@ -104,22 +104,22 @@ class PreloadedDataset(Dataset):
         return len(self.dataset)
 
     def apply_image_transform(self, img):
-        current_img_transforms = get_image_transform(
+        self.current_img_transforms = get_image_transform(
             aug_pool=self.image_augmentation_pool,
             size=self.image_size,
             k=self.image_random_k,
             is_train=self.is_train,
         )
-        augmented_img = current_img_transforms(img)
+        augmented_img = self.current_img_transforms(img)
         return augmented_img
 
     def apply_text_transform(self, caption):
-        current_text_transforms = get_text_transform(
+        self.current_text_transforms = get_text_transform(
             aug_pool=self.text_augmentation_pool,
             k=self.text_random_k,
             is_train=self.is_train,
         )
-        caption = current_text_transforms(caption)
+        caption = self.current_text_transforms(caption)
         return caption
 
     def apply_ss_image_transform(self, img):

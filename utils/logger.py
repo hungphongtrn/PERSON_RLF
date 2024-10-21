@@ -1,7 +1,7 @@
 import logging
 import os
 from logging.handlers import RotatingFileHandler
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, Union
 
 from omegaconf import DictConfig
 from lightning.pytorch.loggers import TensorBoardLogger, WandbLogger, Logger
@@ -121,7 +121,7 @@ def setup_checkpoint_callback(
 def setup_logging(
     config: DictConfig,
     experiment_name: Optional[str] = None,
-) -> Tuple[TensorBoardLogger, ModelCheckpoint]:
+) -> Tuple[Union[WandbLogger, TensorBoardLogger], ModelCheckpoint]:
     """Set up logging and checkpoints."""
     # Configure logging levels
     logging.basicConfig(

@@ -1,15 +1,17 @@
-import os
 import logging
+import os
 
 import hydra
 import lightning as L
+import matplotlib.pyplot as plt
 from lightning.pytorch import seed_everything
-from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
-from lightning.pytorch.loggers import TensorBoardLogger
+from lightning.pytorch.callbacks import LearningRateMonitor
 from omegaconf import OmegaConf, DictConfig
 
 from lightning_models import LitTBPS
 from lightning_data import TBPSDataModule
+from utils.logger import setup_logging
+from utils.visualize_test import visualize_test
 
 
 # Setting up the loggeer
@@ -26,17 +28,13 @@ def resolve_tuple(*args):
 OmegaConf.register_new_resolver("tuple", resolve_tuple)
 
 
-@hydra.main(version_base=None, config_path="config", config_name="config")
+@hydra.main(version_base=None, config_path="config")
 def run(config: DictConfig) -> None:
     OmegaConf.set_struct(config, False)
     # Set the seed
     seed_everything(config.seed)
 
-    # Get the version
-    version = config.get("version", None)
-    # Assert if the version already exists
-    if version == os.path.join(config.trainer.default_root_dir, version):
-        raise ValueError(f"Version {version} already exists")
+    training_logger, checkpoint_callback = setup_logging(config)
 
     # Modify the config if use MLM
     if config.loss.MLM:
@@ -47,7 +45,6 @@ def run(config: DictConfig) -> None:
     # Load the data module
     dm = TBPSDataModule(config)
     dm.setup()
-
     tokenizer = dm.tokenizer
 
     # Log an example of the dataset
@@ -55,20 +52,8 @@ def run(config: DictConfig) -> None:
 
     # Prepare dataloader
     train_loader = dm.train_dataloader()
+    val_loader = dm.val_dataloader()
     test_loader = dm.test_dataloader()
-
-    # Experiment name
-    model_short_name = config.backbone.type.split(".")[-1]
-    experiment_name = config.dataset.dataset_name + "_" + model_short_name
-
-    # Preparing Checkpoint Callback
-    checkpoint_callback = ModelCheckpoint(
-        filename=experiment_name + "_{epoch}-{total_loss:.2f}-{eval_score:.2f}",
-        save_top_k=3,
-        monitor="eval_score",
-        mode="max",
-        enable_version_counter=True,
-    )
 
     # Preparing the model
     model = LitTBPS(
@@ -79,12 +64,6 @@ def run(config: DictConfig) -> None:
         num_classes=dm.num_classes,
     )
 
-    # Preparing the monitors
-    board_logger = TensorBoardLogger(
-        save_dir=config.trainer.default_root_dir,
-        version=version,
-        name=experiment_name,
-    )
     lr_monitor = LearningRateMonitor(logging_interval="step")
 
     # Preparing the trainer
@@ -93,24 +72,35 @@ def run(config: DictConfig) -> None:
     logging.info(f"CE Loss ignored tokens: {dm.tokenizer.pad_token_id}")
     trainer = L.Trainer(
         callbacks=[checkpoint_callback, lr_monitor],
-        logger=board_logger,
+        logger=training_logger,
         **trainer_args,
     )
     logging.info(f"Test loader length: {len(iter(test_loader))}")
 
-    trainer.validate(model, test_loader)
+    if config.logger.logger_type == "wandb":
+        training_logger.watch(model, log="all")
+
+    trainer.validate(model, val_loader)
 
     if config.get("ckpt_path", None):
-        logging.info(f"Resuming from checkpoint: {config.trainer.ckpt_path}")
+        logging.info(f"Resuming from checkpoint: {config.ckpt_path}")
         trainer.fit(
             model,
             train_dataloaders=train_loader,
-            val_dataloaders=test_loader,
+            val_dataloaders=val_loader,
             ckpt_path=config.ckpt_path,
         )
     else:
         logging.info("Starting training from scratch")
-        trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=test_loader)
+        trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
+
+    trainer.test(model, ckpt_path="best", dataloaders=test_loader)
+    fig = visualize_test(model.test_final_outputs, tokenizer)
+    plt.savefig(os.path.join(training_logger.save_dir, "test_visualization.png"))
+
+    if config.logger.logger_type == "wandb":
+        # Log figure to wandb
+        training_logger.log({"test_visualization": fig})
 
 
 if __name__ == "__main__":

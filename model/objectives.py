@@ -14,22 +14,13 @@ def compute_sdm(
 ):
     """
     Similarity Distribution Matching
-
-    Args:
-        image_fetures: image features after pooling
-        text_fetures: text features after pooling
-        pid: person id for each image-text pair
-        logit_scale: scaling factor for the logits
-        image_id: image id for each image-text pair
-        factor: scaling factor for the image_id mask
-        epsilon: small value to avoid log(0)
     """
     batch_size = image_fetures.shape[0]
     pid = pid.reshape((batch_size, 1))  # make sure pid size is [batch_size, 1]
     pid_dist = pid - pid.t()
     labels = (pid_dist == 0).float()
 
-    if image_id is not None:
+    if image_id != None:
         # print("Mix PID and ImageID to create soft label.")
         image_id = image_id.reshape((-1, 1))
         image_id_dist = image_id - image_id.t()
@@ -44,7 +35,7 @@ def compute_sdm(
     image_proj_text = logit_scale * i2t_cosine_theta
 
     # normalize the true matching distribution
-    labels_distribute = labels / labels.norm(dim=1)
+    labels_distribute = labels / labels.sum(dim=1)
 
     i2t_pred = F.softmax(image_proj_text, dim=1)
     i2t_loss = i2t_pred * (
@@ -148,10 +139,8 @@ def compute_cmpm(image_embeddings, text_embeddings, labels, epsilon=1e-8):
     labels_dist = labels_reshape - labels_reshape.t()
     labels_mask = (labels_dist == 0).float()
 
-    image_norm = image_embeddings / image_embeddings.norm(dim=1, keepdim=True)
-    text_norm = text_embeddings / text_embeddings.norm(dim=1, keepdim=True)
-    image_proj_text = torch.matmul(image_embeddings, text_norm.t())
-    text_proj_image = torch.matmul(text_embeddings, image_norm.t())
+    image_proj_text = torch.matmul(image_embeddings, image_embeddings.t())
+    text_proj_image = torch.matmul(text_embeddings, image_embeddings.t())
 
     # normalize the true matching distribution
     labels_mask_norm = labels_mask / labels_mask.norm(dim=1)

@@ -154,7 +154,7 @@ class TBPS(nn.Module):
             last_hidden = self.backbone.visual_projection(last_hidden)
             return pooler_output, last_hidden
 
-        return pooler_output
+        return pooler_output / pooler_output.norm(dim=1, keepdim=True)
 
     def encode_text(self, text, return_last_hidden=False):
         """
@@ -179,7 +179,7 @@ class TBPS(nn.Module):
             last_hidden = self.backbone.text_projection(last_hidden)
             return pooler_output, last_hidden
 
-        return pooler_output
+        return pooler_output / pooler_output.norm(dim=1, keepdim=True)
 
     def forward(self, batch, alpha):
         """
@@ -256,9 +256,7 @@ class TBPS(nn.Module):
                 )
                 nitc_loss = (nitc_loss + augmented_nitc_loss) / 2
 
-            ret.update(
-                {"nitc_loss": nitc_loss * self.config.loss.nitc_loss_weight}
-            )
+            ret.update({"nitc_loss": nitc_loss * self.config.loss.nitc_loss_weight})
 
         # Compute CITC loss
         if self.config.loss.get("CITC", None):

@@ -29,7 +29,7 @@ def get_config_overrides() -> Dict[str, Any]:
     return overrides
 
 
-def generate_experiment_name(overrides: Dict[str, Any]) -> str:
+def generate_experiment_name(config_name: str, overrides: Dict[str, Any]) -> str:
     """Generate experiment name based on config overrides."""
     if not overrides:
         return "base"
@@ -45,7 +45,7 @@ def generate_experiment_name(overrides: Dict[str, Any]) -> str:
             value = "custom"
         override_parts.append(f"{key}_{value}")
 
-    return f"{'_'.join(override_parts)}"
+    return f"{config_name}_{'_'.join(override_parts)}"
 
 
 def setup_logger(
@@ -65,7 +65,7 @@ def setup_logger(
     if experiment_name is None:
         experiment_name = config.logger.experiment_name
         if experiment_name is None:
-            experiment_name = generate_experiment_name(overrides)
+            experiment_name = generate_experiment_name(config_name, overrides)
 
     # Set up logging directory
     base_log_dir = config.logger.checkpoint_log_dir

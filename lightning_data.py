@@ -57,7 +57,10 @@ class TBPSDataModule(pl.LightningDataModule):
         self.text_aug_pool = build_text_aug_pool(self.config.aug.text.augment_cfg)
         self.image_random_k = self.config.aug.image_random_k
         self.text_random_k = self.config.aug.text_random_k
-        self.ss_aug = self.config.loss.SS
+        if self.config.loss.SS:
+            self.ss_aug = True
+        else:
+            self.ss_aug = None
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
@@ -176,23 +179,27 @@ class TBPSDataModule(pl.LightningDataModule):
             )
             raise ValueError("Unsupported sampler type")
 
-    # def val_dataloader(self):
-    #     val_img_loader = DataLoader(
-    #         self.val_img_set,
-    #         batch_size=self.config.dataset.batch_size,
-    #         shuffle=False,
-    #         num_workers=self.config.dataset.num_workers,
-    #         collate_fn=padded_collate,
-    #     )
-    #     val_txt_loader = DataLoader(
-    #         self.val_txt_set,
-    #         batch_size=self.config.dataset.batch_size,
-    #         shuffle=False,
-    #         num_workers=self.config.dataset.num_workers,
-    #         collate_fn=padded_collate,
-    #     )
-
-    #     return [val_img_loader, val_txt_loader]
+    def val_dataloader(self):
+        val_img_loader = DataLoader(
+            self.test_img_set,
+            batch_size=self.config.dataset.test_batch_size,
+            shuffle=False,
+            num_workers=self.config.dataset.num_workers,
+            # collate_fn=self.collate_fn,
+        )
+        val_txt_loader = DataLoader(
+            self.test_txt_set,
+            batch_size=self.config.dataset.test_batch_size,
+            shuffle=False,
+            num_workers=self.config.dataset.num_workers,
+            # collate_fn=self.collate_fn,
+        )
+        combined_val = {
+            "img": val_img_loader,
+            "txt": val_txt_loader,
+        }
+        combined_loader = CombinedLoader(combined_val, mode="max_size")
+        return combined_loader
 
     def test_dataloader(self):
         test_img_loader = DataLoader(
@@ -213,5 +220,5 @@ class TBPSDataModule(pl.LightningDataModule):
             "img": test_img_loader,
             "txt": test_txt_loader,
         }
-        combined_loader = CombinedLoader(combined_test, mode="max_size")
+        combined_loader = CombinedLoader(combined_test, mode="sequential")
         return combined_loader

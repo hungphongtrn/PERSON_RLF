@@ -1,0 +1,17 @@
+size: ${img_size}
+augment_cfg:
+  torchvision.transforms.Resize:
+    size: ${img_size}
+  torchvision.transforms.RandomHorizontalFlip:
+    p: 0.5
+  torchvision.transforms.Pad:
+    padding: 10
+  torchvision.transforms.RandomCrop:
+    size: ${img_size}
+  torchvision.transforms.ToTensor: null
+  torchvision.transforms.Normalize:
+    mean: ${tuple:0.485, 0.456, 0.406}
+    std: ${tuple:0.229, 0.224, 0.225}
+  torchvision.transforms.RandomErasing:
+    scale: ${tuple:0.10, 0.20}
+    value: ${tuple:0.485, 0.456, 0.406}

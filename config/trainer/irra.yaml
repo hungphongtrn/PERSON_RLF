@@ -1,0 +1,14 @@
+# ckpt_path:
+max_epochs: 60
+precision: 16
+accumulate_grad_batches: 2
+accelerator: gpu
+log_every_n_steps: 1
+detect_anomaly: false
+enable_progress_bar: true
+enable_model_summary: true
+enable_checkpointing: true
+# fast_dev_run: 16
+num_sanity_val_steps: 0
+gradient_clip_val: null
+gradient_clip_algorithm: null

@@ -1,0 +1,17 @@
+defaults:
+  - _self_
+  - dataset: vn3k_en
+  - loss: irra
+  - aug: irra
+  - trainer: irra
+  - optimizer: irra
+  - scheduler: irra
+  - tokenizer: clip
+  - backbone: clip
+  - logger: default
+
+training: true
+dataset_root_dir: .
+distributed: false
+img_size: ${tuple:384, 128}
+seed: 2307

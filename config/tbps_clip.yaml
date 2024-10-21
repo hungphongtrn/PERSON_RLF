@@ -1,17 +1,18 @@
+# config/config.yaml
 defaults:
   - _self_
   - dataset: vn3k_en
   - loss: tbps_clip
   - aug: tbps_clip
-  - trainer: default
+  - trainer: tbps_clip
   - optimizer: tbps_clip
   - scheduler: tbps_clip
   - tokenizer: clip
   - backbone: clip
+  - logger: default
 
-version: 1
 training: true
 dataset_root_dir: .
 distributed: false
 img_size: ${tuple:384, 128}
-seed: 42
+seed: 2307

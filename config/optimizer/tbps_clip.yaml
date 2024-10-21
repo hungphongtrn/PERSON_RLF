@@ -1,5 +1,5 @@
 type: torch.optim.AdamW
-lr: 1e-4
+lr: 1e-5
 lr_factor: 5.0
 bias_lr_factor: 2.0
 weight_decay: 0.02

@@ -1,0 +1,6 @@
+defaults:
+  - img: irra
+  - text: irra
+
+image_random_k: -1
+text_random_k: -1

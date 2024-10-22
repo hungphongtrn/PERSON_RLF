@@ -96,11 +96,12 @@ def run(config: DictConfig) -> None:
 
     trainer.test(model, ckpt_path="best", dataloaders=test_loader)
     fig = visualize_test(model.test_final_outputs, tokenizer)
-    plt.savefig(os.path.join(training_logger.save_dir, "test_visualization.png"))
+    img_path = os.path.join(training_logger.save_dir, "test_visualization.png")
+    plt.savefig(img_path)
 
     if config.logger.logger_type == "wandb":
         # Log figure to wandb
-        training_logger.log({"test_visualization": fig})
+        training_logger.log_image(key="prediction_output", images=[img_path])
 
 
 if __name__ == "__main__":

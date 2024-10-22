@@ -82,6 +82,8 @@ def setup_logger(
             version=None,  # Overrides as version (e.g., 'aug_irra_loss_irra')
         )
     elif config.logger.logger_type == "wandb":
+        # Create {save_dir}/{experiment_name}/wandb directory
+        os.makedirs(os.path.join(log_dir, experiment_name, "wandb"), exist_ok=True)
         logger = WandbLogger(
             name=experiment_name,
             save_dir=os.path.join(log_dir, experiment_name),
@@ -95,7 +97,7 @@ def setup_logger(
     logging.info(f"Log directory: {logger.save_dir}")
 
     if logger:
-        return logger, log_dir, overridden_config
+        return logger
     else:
         raise ValueError("No logger specified in config.")
 
@@ -103,12 +105,9 @@ def setup_logger(
 def setup_checkpoint_callback(
     config: DictConfig,
     log_dir: str,
-    overridden_config: str,
 ) -> ModelCheckpoint:
     """Set up checkpoint callback."""
-    if not overridden_config:
-        overridden_config = "base"
-    checkpoint_path = os.path.join(log_dir, overridden_config, "checkpoints")
+    checkpoint_path = os.path.join(log_dir, "checkpoints")
     logging.info(f"Checkpoint path: {checkpoint_path}")
     return ModelCheckpoint(
         dirpath=checkpoint_path,
@@ -132,10 +131,10 @@ def setup_logging(
     )
 
     # Set up TensorBoard logger
-    training_logger, log_dir, overridden_config = setup_logger(config, experiment_name)
+    training_logger = setup_logger(config, experiment_name)
 
     # Set up checkpoint callback
-    checkpoint_callback = setup_checkpoint_callback(config, log_dir, overridden_config)
+    checkpoint_callback = setup_checkpoint_callback(config, training_logger.save_dir)
 
     # Add file logging if configured
     if config.logger.file.filename:

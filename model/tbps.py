@@ -49,6 +49,8 @@ class TBPS(nn.Module):
                 self.embed_dim, self.embed_dim, self.embed_dim
             )
 
+        self.use_sigmoid = config.loss.use_sigmoid
+
         if config.loss.get("ID", None):
             self.classifier = nn.Linear(self.embed_dim, self.num_classes)
             nn.init.normal_(self.classifier.weight.data, std=0.001)
@@ -146,15 +148,21 @@ class TBPS(nn.Module):
         last_hidden = x.last_hidden_state
 
         if not hasattr(self.backbone, "visual_projection"):
+            # If no projection layer exists, normalize and return
+            normalized_pooler = pooler_output / pooler_output.norm(dim=1, keepdim=True)
             if return_last_hidden:
-                return pooler_output, last_hidden
+                return normalized_pooler, last_hidden
+            return normalized_pooler
 
+        # If projection layer exists, project both outputs
         pooler_output = self.backbone.visual_projection(pooler_output)
+        normalized_pooler = pooler_output / pooler_output.norm(dim=1, keepdim=True)
+
         if return_last_hidden:
             last_hidden = self.backbone.visual_projection(last_hidden)
-            return pooler_output, last_hidden
+            return normalized_pooler, last_hidden
 
-        return pooler_output / pooler_output.norm(dim=1, keepdim=True)
+        return normalized_pooler
 
     def encode_text(self, text, return_last_hidden=False):
         """
@@ -171,15 +179,37 @@ class TBPS(nn.Module):
         last_hidden = x.last_hidden_state
 
         if not hasattr(self.backbone, "text_projection"):
+            # If no projection layer exists, normalize and return
+            normalized_pooler = pooler_output / pooler_output.norm(dim=1, keepdim=True)
             if return_last_hidden:
-                return pooler_output, last_hidden
+                return normalized_pooler, last_hidden
+            return normalized_pooler
 
+        # If projection layer exists, project both outputs
         pooler_output = self.backbone.text_projection(pooler_output)
+        normalized_pooler = pooler_output / pooler_output.norm(dim=1, keepdim=True)
+
         if return_last_hidden:
             last_hidden = self.backbone.text_projection(last_hidden)
-            return pooler_output, last_hidden
+            return normalized_pooler, last_hidden
 
-        return pooler_output / pooler_output.norm(dim=1, keepdim=True)
+        return normalized_pooler
+
+    def prepare_sim_targets(self, pids):
+        """
+        Prepare similarity targets for constrative learning.
+
+        Args:
+            pids (torch.Tensor): Tensor containing the person IDs.
+        Returns:
+            torch.Tensor: Tensor containing the similarity targets.
+        """
+        sim_targets = torch.eq(pids.view(-1, 1), pids.view(1, -1)).float()
+        if self.use_sigmoid:
+            sim_targets = -torch.ones_like(sim_targets) + 2 * sim_targets # -1 if different, 1 if same
+            return sim_targets
+        
+        return sim_targets / sim_targets.sum(dim=1, keepdim=True) # normalize the true matching distribution
 
     def forward(self, batch, alpha):
         """
@@ -225,10 +255,7 @@ class TBPS(nn.Module):
 
         # Compute NITC loss
         if self.config.loss.get("NITC", None):
-            sim_targets = torch.eq(
-                batch["pids"].view(-1, 1), batch["pids"].view(1, -1)
-            ).float()
-            sim_targets /= sim_targets.sum(dim=1, keepdim=True)
+            sim_targets = self.prepare_sim_targets(batch["pids"])
             image_pooler_output_stopped = image_pooler_output.clone().detach()
             caption_pooler_output_stopped = caption_pooler_output.clone().detach()
             nitc_loss = objectives.compute_constrative(
@@ -271,10 +298,7 @@ class TBPS(nn.Module):
 
         # Compute RITC loss
         if self.config.loss.get("RITC", None):
-            sim_targets = torch.eq(
-                batch["pids"].view(-1, 1), batch["pids"].view(1, -1)
-            ).float()
-            sim_targets /= sim_targets.sum(dim=1, keepdim=True)
+            sim_targets = self.prepare_sim_targets(batch["pids"])
             loss = objectives.compute_ritc(
                 image_pooler_output,
                 caption_pooler_output,

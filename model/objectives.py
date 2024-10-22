@@ -243,15 +243,21 @@ def compute_constrative(
         alpha: scaling factor for the similarity targets
         logit_scale: scaling factor for the logits
     """
-    with torch.no_grad():
-        # Soft labels for the similarity targets
-        sim_i2t_s = logit_scale * image_features_stopped @ text_features.t()
-        sim_t2i_s = logit_scale * text_features_stopped @ image_features.t()
-        # Soft + hard labels for the similarity targets
-        sim_i2t_target = alpha * F.softmax(sim_i2t_s, dim=1) + (1 - alpha) * sim_targets
-        sim_t2i_targets = (
-            alpha * F.softmax(sim_t2i_s, dim=1) + (1 - alpha) * sim_targets
-        )
+    if alpha != 0:
+        with torch.no_grad():
+            # Soft labels for the similarity targets
+            sim_i2t_s = logit_scale * image_features_stopped @ text_features.t()
+            sim_t2i_s = logit_scale * text_features_stopped @ image_features.t()
+            # Soft + hard labels for the similarity targets
+            sim_i2t_target = (
+                alpha * F.softmax(sim_i2t_s, dim=1) + (1 - alpha) * sim_targets
+            )
+            sim_t2i_targets = (
+                alpha * F.softmax(sim_t2i_s, dim=1) + (1 - alpha) * sim_targets
+            )
+    else:
+        sim_i2t_target = sim_targets
+        sim_t2i_targets = sim_targets
 
     # Compute the cosine similarity between the image and text features as the logits
     sim_i2t = logit_scale * image_features @ text_features.t()

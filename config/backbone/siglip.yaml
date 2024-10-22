@@ -1,0 +1,14 @@
+type: model.siglip.modeling_siglip.SiglipModel
+path: siglip_checkpoints/model.safetensors
+config_type: model.siglip.configuration_siglip.SiglipConfig
+original_model_include_cls_token: false
+# text config
+text_config:
+  vocab_size: ${tokenizer.vocab_size}
+  max_position_embeddings: ${tokenizer.model_max_length}
+  attention_dropout: 0.05
+vision_config:
+  image_size: ${img_size}
+num_visual_horizontal_patches: 8
+num_visual_vertical_patches: 24
+embedding_dim: 768

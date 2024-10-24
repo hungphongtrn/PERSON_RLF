@@ -4,14 +4,16 @@ import os
 import hydra
 import lightning as L
 import matplotlib.pyplot as plt
+import wandb
 from lightning.pytorch import seed_everything
 from lightning.pytorch.callbacks import LearningRateMonitor
 from omegaconf import OmegaConf, DictConfig
+from PIL import Image
 
 from lightning_models import LitTBPS
 from lightning_data import TBPSDataModule
 from utils.logger import setup_logging
-from utils.visualize_test import visualize_test
+from utils.visualize_test import visualize_test, prepare_prediction_for_wandb_table
 
 
 # Setting up the loggeer
@@ -101,7 +103,17 @@ def run(config: DictConfig) -> None:
 
     if config.logger.logger_type == "wandb":
         # Log figure to wandb
-        training_logger.log_image(key="prediction_output", images=[img_path])
+        wandb_visualized_data = prepare_prediction_for_wandb_table(
+            model.test_final_outputs, tokenizer
+        )
+        columns = wandb_visualized_data["columns"]
+        data = wandb_visualized_data["data"]
+        # Convert PIL images to wandb.Image
+        data = [
+            [wandb.Image(data) if isinstance(data, Image) else data for data in row]
+            for row in data
+        ]
+        training_logger.log_table(key="test_visualization", columns=columns, data=data)
 
 
 if __name__ == "__main__":

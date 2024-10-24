@@ -3,7 +3,7 @@ import os
 from logging.handlers import RotatingFileHandler
 from typing import Optional, Dict, Any, Tuple, Union
 
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from lightning.pytorch.loggers import TensorBoardLogger, WandbLogger, Logger
 from lightning.pytorch.callbacks import ModelCheckpoint
 from hydra.core.hydra_config import HydraConfig
@@ -67,10 +67,8 @@ def setup_logger(
         if experiment_name is None:
             experiment_name = generate_experiment_name(config_name, overrides)
 
-    # Set up logging directory
-    base_log_dir = config.logger.checkpoint_log_dir
-    log_dir = os.path.join(base_log_dir, config_name)  # base_logs/config_name
-    overridden_config = "_".join([f"{k}_{v}" for k, v in sorted(overrides.items())])
+    # Save checkpoint and log files in hydra output directory
+    log_dir = HydraConfig.get().runtime.output_dir
 
     logger = None
 
@@ -83,17 +81,18 @@ def setup_logger(
         )
     elif config.logger.logger_type == "wandb":
         # Create {save_dir}/{experiment_name}/wandb directory
-        os.makedirs(os.path.join(log_dir, experiment_name, "wandb"), exist_ok=True)
+        os.makedirs(os.path.join(log_dir, "wandb"), exist_ok=True)
         logger = WandbLogger(
             name=experiment_name,
-            save_dir=os.path.join(log_dir, experiment_name),
+            save_dir=os.path.join(log_dir, "wandb"),
             version=None,
             project="PERSON_SEARCH",
+            config=OmegaConf.to_container(config, resolve=True),
         )
 
     logging.info("Logger setup:")
     logging.info(f"Base config: {config_name}")
-    logging.info(f"Overrides as version: {overridden_config}")
+    logging.info(f"Overrided config: {overrides}")
     logging.info(f"Log directory: {logger.save_dir}")
 
     if logger:

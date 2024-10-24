@@ -2,6 +2,7 @@ import logging
 
 import lightning as L
 import torch
+import wandb
 from lightning.pytorch.utilities import grad_norm
 from prettytable import PrettyTable
 
@@ -85,7 +86,8 @@ class LitTBPS(L.LightningModule):
 
     def on_validation_epoch_end(self):
         logging.info("Validation epoch end")
-        table = PrettyTable(["task", "R1", "R5", "R10", "mAP", "mINP"])
+        columns = ["task", "R1", "R5", "R10", "mAP", "mINP"]
+        table = PrettyTable(columns)
 
         image_ids = torch.cat(self.validation_step_outputs["image_ids"], 0)
         image_feats = torch.cat(self.validation_step_outputs["image_feats"], 0)
@@ -112,7 +114,6 @@ class LitTBPS(L.LightningModule):
             t2i_mAP.tolist(),
             t2i_mINP.tolist(),
         )
-        table.add_row(["t2i", t2i_cmc[0], t2i_cmc[4], t2i_cmc[9], t2i_mAP, t2i_mINP])
 
         i2t_cmc, i2t_mAP, i2t_mINP, _ = rank(
             similarity=similarity.t(),
@@ -126,7 +127,14 @@ class LitTBPS(L.LightningModule):
             i2t_mAP.tolist(),
             i2t_mINP.tolist(),
         )
-        table.add_row(["i2t", i2t_cmc[0], i2t_cmc[4], i2t_cmc[9], i2t_mAP, i2t_mINP])
+
+        data = [
+            ["t2i", t2i_cmc[0], t2i_cmc[4], t2i_cmc[9], t2i_mAP, t2i_mINP],
+            ["i2t", i2t_cmc[0], i2t_cmc[4], i2t_cmc[9], i2t_mAP, i2t_mINP],
+        ]
+
+        for row in data:
+            table.add_row(row)
 
         results = {
             "t2i_R1": t2i_cmc[0],
@@ -146,6 +154,10 @@ class LitTBPS(L.LightningModule):
             "eval_score", results["t2i_R1"], on_step=False, on_epoch=True, prog_bar=True
         )
         logging.info("\n" + str(table))
+
+        # Logging the results to wandb
+        if self.config.logger.logger_type == "wandb":
+            self.log_table(key="validation_results", columns=columns, data=data)
 
         # Reset the outputs
         self.validation_step_outputs = {

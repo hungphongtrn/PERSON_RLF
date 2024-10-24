@@ -12,3 +12,6 @@ vision_config:
 num_visual_horizontal_patches: 8
 num_visual_vertical_patches: 24
 embedding_dim: 512
+use_sigmoid: false
+pre_log_logit_scale_init: null
+logit_bias_init: null

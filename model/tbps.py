@@ -27,10 +27,34 @@ class TBPS(nn.Module):
         self.text_model = backbone.text_model
         self.embed_dim = config.backbone.embedding_dim
 
+        self.use_sigmoid = config.backbone.use_sigmoid
+
         self.logit_scale = nn.Parameter(
             torch.ones([])
         )  # Trainable parameter for scaling logits
-        nn.init.constant_(self.logit_scale, np.log(1 / 0.07))
+        # Use the default value for logit scale if not provided
+        if config.backbone.pre_log_logit_scale_init:
+            nn.init.constant_(
+                self.logit_scale, np.log(config.backbone.pre_log_logit_scale_init)
+            )
+            logger.info(
+                f"Initializing logit_scale with log of {config.backbone.pre_log_logit_scale_init}"
+            )
+        else:
+            nn.init.constant_(
+                self.logit_scale, np.log(1 / 0.07)
+            )  # 1/0.07 is the default value
+            logger.info("Initializing logit_scale with log of 1/0.07")
+
+        if self.use_sigmoid:
+            self.logit_bias = nn.Parameter(torch.ones([]))
+            nn.init.constant_(self.logit_bias, config.backbone.logit_bias_init)
+            logger.info(
+                f"Initializing logit bias with {config.backbone.logit_bias_init}"
+            )
+        else:
+            self.logit_bias = None
+            logger.info("Not using sigmoid, logit bias is not needed")
 
         task_lists = []
         for task in TASK_LIST:
@@ -48,8 +72,6 @@ class TBPS(nn.Module):
             self.simclr_mlp = self._build_mlp(
                 self.embed_dim, self.embed_dim, self.embed_dim
             )
-
-        self.use_sigmoid = config.loss.use_sigmoid
 
         if config.loss.get("ID", None):
             self.classifier = nn.Linear(self.embed_dim, self.num_classes)
@@ -195,7 +217,7 @@ class TBPS(nn.Module):
 
         return normalized_pooler
 
-    def prepare_sim_targets(self, pids):
+    def prepare_sim_targets(self, pids, use_sigmoid=False):
         """
         Prepare similarity targets for constrative learning.
 
@@ -205,11 +227,15 @@ class TBPS(nn.Module):
             torch.Tensor: Tensor containing the similarity targets.
         """
         sim_targets = torch.eq(pids.view(-1, 1), pids.view(1, -1)).float()
-        if self.use_sigmoid:
-            sim_targets = -torch.ones_like(sim_targets) + 2 * sim_targets # -1 if different, 1 if same
+        if use_sigmoid:
+            sim_targets = (
+                -torch.ones_like(sim_targets) + 2 * sim_targets
+            )  # -1 if different, 1 if same
             return sim_targets
-        
-        return sim_targets / sim_targets.sum(dim=1, keepdim=True) # normalize the true matching distribution
+
+        return sim_targets / sim_targets.sum(
+            dim=1, keepdim=True
+        )  # normalize the true matching distribution
 
     def forward(self, batch, alpha):
         """
@@ -229,7 +255,9 @@ class TBPS(nn.Module):
         images = batch["images"]
 
         logit_scale = self.logit_scale.exp()
-        logit_scale.data = torch.clamp(logit_scale.data, max=100)
+        # Clamp the logit scale to prevent numerical instability if not using sigmoid
+        if not self.use_sigmoid:
+            logit_scale.data = torch.clamp(logit_scale.data, max=100)
 
         if self.config.loss.get("MLM", None):
             image_pooler_output, image_last_hidden = self.encode_image(images, True)
@@ -237,7 +265,7 @@ class TBPS(nn.Module):
             image_pooler_output = self.encode_image(images)
         caption_pooler_output = self.encode_text(caption_input)
 
-        ret.update({"temperature": 1 / logit_scale})
+        ret.update({"temperature": logit_scale})
 
         # Improve data efficiency with SimCLR
         if self.config.loss.get("SS", None):
@@ -255,7 +283,7 @@ class TBPS(nn.Module):
 
         # Compute NITC loss
         if self.config.loss.get("NITC", None):
-            sim_targets = self.prepare_sim_targets(batch["pids"])
+            sim_targets = self.prepare_sim_targets(batch["pids"], self.use_sigmoid)
             image_pooler_output_stopped = image_pooler_output.clone().detach()
             caption_pooler_output_stopped = caption_pooler_output.clone().detach()
             nitc_loss = objectives.compute_constrative(
@@ -266,6 +294,8 @@ class TBPS(nn.Module):
                 sim_targets=sim_targets,
                 alpha=alpha,
                 logit_scale=logit_scale,
+                use_sigmoid=self.use_sigmoid,
+                logit_bias=self.logit_bias,
             )
             if self.config.loss.get("MVS", None):
                 aug_images = batch["aug_images"]
@@ -280,6 +310,8 @@ class TBPS(nn.Module):
                     sim_targets=sim_targets,
                     alpha=alpha,
                     logit_scale=logit_scale,
+                    use_sigmoid=self.use_sigmoid,
+                    logit_bias=self.logit_bias,
                 )
                 nitc_loss = (nitc_loss + augmented_nitc_loss) / 2
 
@@ -293,18 +325,25 @@ class TBPS(nn.Module):
                 logit_scale,
                 self.config.loss.citc_inmodal_weight,
                 self.config.loss.citc_intermodal_weight,
+                self.use_sigmoid,
+                self.logit_bias,
             )
             ret.update({"citc_loss": loss * self.config.loss.citc_loss_weight})
 
         # Compute RITC loss
         if self.config.loss.get("RITC", None):
-            sim_targets = self.prepare_sim_targets(batch["pids"])
+            if self.use_sigmoid:
+                raise ValueError("RITC loss does not support sigmoid")
+
+            sim_targets = self.prepare_sim_targets(batch["pids"], use_sigmoid=False)
             loss = objectives.compute_ritc(
                 image_pooler_output,
                 caption_pooler_output,
                 logit_scale,
                 sim_targets,
                 self.config.loss.ritc_eps,
+                self.use_sigmoid,
+                self.logit_bias,
             )
             ret.update({"ritc_loss": loss * self.config.loss.ritc_loss_weight})
 

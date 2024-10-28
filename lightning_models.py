@@ -2,7 +2,8 @@ import logging
 
 import lightning as L
 import torch
-import wandb
+
+# import wandb
 from lightning.pytorch.utilities import grad_norm
 from prettytable import PrettyTable
 
@@ -38,7 +39,9 @@ class LitTBPS(L.LightningModule):
             pad_token_id=pad_token_id,
             num_classes=num_classes,
         )
-        self.num_iters_per_epoch = num_iters_per_epoch
+        self.num_iters_per_epoch = (
+            num_iters_per_epoch // self.config.trainer.accumulate_grad_batches
+        )
         self.validation_step_outputs = {
             "text_ids": [],
             "image_ids": [],
@@ -93,12 +96,6 @@ class LitTBPS(L.LightningModule):
         image_feats = torch.cat(self.validation_step_outputs["image_feats"], 0)
         text_ids = torch.cat(self.validation_step_outputs["text_ids"], 0)
         text_feats = torch.cat(self.validation_step_outputs["text_feats"], 0)
-
-        # # Logging statistics of the validation set
-        # logging.info(f"Image ids: {image_ids.size()}")
-        # logging.info(f"Text ids: {text_ids.size()}")
-        # logging.info(f"Image feats: {image_feats.size()}")
-        # logging.info(f"Text feats: {text_feats.size()}")
 
         similarity = text_feats @ image_feats.t()
 
@@ -156,8 +153,8 @@ class LitTBPS(L.LightningModule):
         logging.info("\n" + str(table))
 
         # Logging the results to wandb
-        if self.config.logger.logger_type == "wandb":
-            self.log_table(key="validation_results", columns=columns, data=data)
+        # if self.config.logger.logger_type == "wandb":
+        #     self.logger.log_table(key="validation_results", columns=columns, data=data)
 
         # Reset the outputs
         self.validation_step_outputs = {
@@ -166,6 +163,10 @@ class LitTBPS(L.LightningModule):
             "text_feats": [],
             "image_feats": [],
         }
+
+        # Clean up the memory
+        del image_ids, image_feats, text_ids, text_feats, similarity
+        del t2i_cmc, t2i_mAP, t2i_mINP, i2t_cmc, i2t_mAP, i2t_mINP
 
     def configure_optimizers(self):
         optimizer = build_optimizer(self.config.optimizer, self.model)
@@ -264,5 +265,15 @@ class LitTBPS(L.LightningModule):
                         }
                         break
                 wrong_predictions.append(row)
+
+        # Clean up the memory
+        del (
+            test_img_data,
+            test_txt_data,
+            indices,
+            true_person_ids,
+            predicted_image_ids,
+            predicted_person_ids,
+        )
 
         return wrong_predictions

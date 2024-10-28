@@ -3,6 +3,7 @@ import os
 from logging.handlers import RotatingFileHandler
 from typing import Optional, Dict, Any, Tuple, Union
 
+import wandb
 from omegaconf import DictConfig, OmegaConf
 from lightning.pytorch.loggers import TensorBoardLogger, WandbLogger, Logger
 from lightning.pytorch.callbacks import ModelCheckpoint
@@ -57,9 +58,7 @@ def setup_logger(
     # Get base config name and overrides
     hydra_cfg = HydraConfig.get()
     config_name = hydra_cfg.job.config_name  # Base config name (e.g., 'vn3k_en')
-    overrides = (
-        get_config_overrides()
-    )  # Overrides applied (e.g., {'aug': 'irra', 'loss': 'irra'})
+    overrides = get_config_overrides()
 
     # Generate experiment name if not already provided
     if experiment_name is None:
@@ -84,10 +83,11 @@ def setup_logger(
         os.makedirs(os.path.join(log_dir, "wandb"), exist_ok=True)
         logger = WandbLogger(
             name=experiment_name,
-            save_dir=os.path.join(log_dir, "wandb"),
+            save_dir=log_dir,
             version=None,
             project="PERSON_SEARCH",
             config=OmegaConf.to_container(config, resolve=True),
+            reinit=True,  # Force new run for each Hydra job
         )
 
     logging.info("Logger setup:")

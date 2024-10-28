@@ -1,5 +1,4 @@
 # config/logger/default.yaml
-checkpoint_log_dir: "logs/"
 experiment_name: null # Will be dynamically set in the Python script
 
 # Checkpoint settings
@@ -15,6 +14,8 @@ checkpoint:
   # flush_secs: 120
   # max_queue: 10
 logger_type: "wandb"
+logger_addtional_args:
+  group: null
 
 # Logging settings
 console:

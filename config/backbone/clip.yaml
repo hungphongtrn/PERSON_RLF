@@ -15,3 +15,4 @@ embedding_dim: 512
 use_sigmoid: false
 pre_log_logit_scale_init: null
 logit_bias_init: null
+freeze_backbone: false

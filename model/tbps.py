@@ -27,12 +27,20 @@ class TBPS(nn.Module):
         self.text_model = backbone.text_model
         self.embed_dim = config.backbone.embedding_dim
 
+        if config.backbone.freeze_backbone:
+            for param in self.vision_model.parameters():
+                param.requires_grad = False
+            for param in self.text_model.parameters():
+                param.requires_grad = False
+            logger.info("Freezing backbone")
+
         self.use_sigmoid = config.backbone.use_sigmoid
 
         self.logit_scale = nn.Parameter(
             torch.ones([])
         )  # Trainable parameter for scaling logits
         # Use the default value for logit scale if not provided
+
         if config.backbone.pre_log_logit_scale_init:
             nn.init.constant_(
                 self.logit_scale, np.log(config.backbone.pre_log_logit_scale_init)
@@ -46,7 +54,7 @@ class TBPS(nn.Module):
             )  # 1/0.07 is the default value
             logger.info("Initializing logit_scale with log of 1/0.07")
 
-        if self.use_sigmoid:
+        if self.use_sigmoid and config.backbone.logit_bias_init:
             self.logit_bias = nn.Parameter(torch.ones([]))
             nn.init.constant_(self.logit_bias, config.backbone.logit_bias_init)
             logger.info(
@@ -55,6 +63,17 @@ class TBPS(nn.Module):
         else:
             self.logit_bias = None
             logger.info("Not using sigmoid, logit bias is not needed")
+
+        # ### EXPERIMENT ONLY
+        # # Freeze logit scale
+        # self.logit_scale.requires_grad = False
+        # logger.info("Freezing logit scale")
+
+        # # # Freeze logit bias
+        # # if self.use_sigmoid:
+        # #     self.logit_bias.requires_grad = False
+        # #     logger.info("Freezing logit bias")
+        # ### DELETE LATER
 
         task_lists = []
         for task in TASK_LIST:
@@ -266,6 +285,8 @@ class TBPS(nn.Module):
         caption_pooler_output = self.encode_text(caption_input)
 
         ret.update({"temperature": logit_scale})
+        if self.logit_bias:
+            ret.update({"bias": self.logit_bias})
 
         # Improve data efficiency with SimCLR
         if self.config.loss.get("SS", None):

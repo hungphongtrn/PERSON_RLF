@@ -300,7 +300,7 @@ def compute_constrative(
         # Compute the cosine similarity between the image and text features as the logits
         logits = logit_scale * image_features @ text_features.t() + logit_bias
         # Commpute the negative log-likelihood loss
-        loss = -torch.sum(F.logsigmoid(logits * sim_targets)) / image_features.shape[0]
+        loss = -F.logsigmoid(sim_targets * logits).sum() / image_features.shape[0]
         return loss
 
     else:

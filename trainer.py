@@ -90,7 +90,7 @@ def run(config: DictConfig) -> None:
     if config.logger.logger_type == "wandb":
         training_logger.watch(model, log="all")
 
-    # trainer.validate(model, val_loader)
+    trainer.validate(model, val_loader)
 
     if config.get("ckpt_path", None):
         logging.info(f"Resuming from checkpoint: {config.ckpt_path}")
@@ -104,34 +104,34 @@ def run(config: DictConfig) -> None:
         logging.info("Starting training from scratch")
         trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
-    # trainer.test(model, ckpt_path="best", dataloaders=test_loader)
-    # # fig = visualize_test(model.test_final_outputs, tokenizer)
-    # # img_path = os.path.join(training_logger.save_dir, "test_visualization.png")
-    # # plt.savefig(img_path)
+    trainer.test(model, ckpt_path="best", dataloaders=test_loader)
+    # fig = visualize_test(model.test_final_outputs, tokenizer)
+    # img_path = os.path.join(training_logger.save_dir, "test_visualization.png")
+    # plt.savefig(img_path)
 
-    # if config.logger.logger_type == "wandb":
-    #     # Log figure to wandb
-    #     wandb_visualized_data = prepare_prediction_for_wandb_table(
-    #         model.test_final_outputs, tokenizer
-    #     )
-    #     columns = wandb_visualized_data["columns"]
-    #     data = wandb_visualized_data["data"]
-    #     # Convert PIL images to wandb.Image
-    #     data = [
-    #         [
-    #             wandb.Image(data) if isinstance(data, Image.Image) else data
-    #             for data in row
-    #         ]
-    #         for row in data
-    #     ]
-    #     training_logger.log_table(key="test_visualization", columns=columns, data=data)
-    #     del (
-    #         columns,
-    #         data,
-    #         wandb_visualized_data,
-    #    )
+    if config.logger.logger_type == "wandb":
+        # Log figure to wandb
+        wandb_visualized_data = prepare_prediction_for_wandb_table(
+            model.test_final_outputs, tokenizer
+        )
+        columns = wandb_visualized_data["columns"]
+        data = wandb_visualized_data["data"]
+        # Convert PIL images to wandb.Image
+        data = [
+            [
+                wandb.Image(data) if isinstance(data, Image.Image) else data
+                for data in row
+            ]
+            for row in data
+        ]
+        training_logger.log_table(key="test_visualization", columns=columns, data=data)
+        del (
+            columns,
+            data,
+            wandb_visualized_data,
+        )
 
-    # del model.test_final_outputs, train_loader, val_loader, test_loader, model, dm
+    del model.test_final_outputs, train_loader, val_loader, test_loader, model, dm
 
     torch.cuda.empty_cache()
     gc.collect()

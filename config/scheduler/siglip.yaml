@@ -1,0 +1,8 @@
+total_epochs: ${trainer.max_epochs}
+type: solver.lr_scheduler.LRSchedulerWithWarmup
+mode: cosine
+warmup_epochs: 1
+warmup_method: linear
+start_lr: 0
+end_lr: 0
+warmup_factor: null

@@ -305,8 +305,12 @@ class TBPS(nn.Module):
         # Compute NITC loss
         if self.config.loss.get("NITC", None):
             sim_targets = self.prepare_sim_targets(batch["pids"], self.use_sigmoid)
-            image_pooler_output_stopped = image_pooler_output.clone().detach()
-            caption_pooler_output_stopped = caption_pooler_output.clone().detach()
+            image_pooler_output_stopped = (
+                image_pooler_output.clone().detach() if alpha != 0 else None
+            )
+            caption_pooler_output_stopped = (
+                caption_pooler_output.clone().detach() if alpha != 0 else None
+            )
             nitc_loss = objectives.compute_constrative(
                 image_features=image_pooler_output,
                 text_features=caption_pooler_output,
@@ -321,7 +325,9 @@ class TBPS(nn.Module):
             if self.config.loss.get("MVS", None):
                 aug_images = batch["aug_images"]
                 aug_images_features = self.encode_image(aug_images)
-                aug_images_features_stopped = aug_images_features.clone().detach()
+                aug_images_features_stopped = (
+                    aug_images_features.clone().detach() if alpha != 0 else None
+                )
                 # Compute NITC loss with augmented images
                 augmented_nitc_loss = objectives.compute_constrative(
                     image_features=image_pooler_output,

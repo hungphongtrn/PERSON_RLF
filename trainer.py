@@ -37,8 +37,6 @@ def run(config: DictConfig) -> None:
     # Set the seed
     seed_everything(config.seed)
 
-    training_logger, checkpoint_callback = setup_logging(config)
-
     # Modify the config if use MLM
     if config.loss.MLM:
         config.tokenizer.vocab_size += 1
@@ -52,6 +50,7 @@ def run(config: DictConfig) -> None:
 
     # Log an example of the dataset
     logging.info(f"Example of the dataset: {dm.train_set[0]}")
+    logging.info(f"Image shape: {dm.train_set[0]['images'].shape}")
 
     # Prepare dataloader
     train_loader = dm.train_dataloader()
@@ -77,6 +76,7 @@ def run(config: DictConfig) -> None:
     lr_monitor = LearningRateMonitor(logging_interval="step")
 
     # Preparing the trainer
+    training_logger, checkpoint_callback = setup_logging(config)
     trainer_args = config.trainer
     logging.info(f"Trainer Args: {trainer_args}")
     logging.info(f"CE Loss ignored tokens: {dm.tokenizer.pad_token_id}")

@@ -76,6 +76,8 @@ def get_image_transform(
         "Resize",
         "ToTensor",
         "Normalize",
+        "PILResize",
+        "Rescale",
     ]
     if not is_train or not aug_pool:
         normalize = transforms.Normalize(

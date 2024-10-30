@@ -1,0 +1,6 @@
+defaults:
+    - img: siglip
+    - text: tbps_clip
+
+image_random_k: 2
+text_random_k: -1

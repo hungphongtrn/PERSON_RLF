@@ -108,6 +108,7 @@ class TBPSDataModule(pl.LightningDataModule):
                 self.val_img_set = ImageDataset(
                     dataset=self.dataset.val,
                     is_train=False,
+                    image_size=self.config.aug.img.size,
                 )
                 self.val_txt_set = TextDataset(
                     dataset=self.dataset.val,
@@ -118,6 +119,7 @@ class TBPSDataModule(pl.LightningDataModule):
         if stage == "test" or stage is None:
             self.test_img_set = ImageDataset(
                 dataset=self.dataset.test,
+                image_size=self.config.aug.img.size,
             )
             self.test_txt_set = TextDataset(
                 dataset=self.dataset.test,

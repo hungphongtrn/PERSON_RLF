@@ -1,4 +1,7 @@
 import logging
+from enum import Enum
+from typing import Optional, Dict, List, Any, Tuple
+from dataclasses import dataclass, field
 
 import lightning as L
 import torch
@@ -12,10 +15,73 @@ from model.tbps import TBPS
 from solver import build_lr_scheduler, build_optimizer
 from utils.metrics import rank
 
+# Configure logging
 logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
+logger = logging.getLogger(__name__)
+
+
+class DataType(Enum):
+    """Enum for different types of data processing"""
+
+    IMAGE = "image"
+    TEXT = "text"
+
+
+@dataclass
+class ModelSample:
+    """Data container for model samples"""
+
+    pids: torch.Tensor
+    images: Optional[torch.Tensor] = None
+    caption_input_ids: Optional[torch.Tensor] = None
+    caption_attention_mask: Optional[torch.Tensor] = None
+
+    def to_device(self, device: torch.device) -> "ModelSample":
+        """Move sample data to specified device"""
+        self.pids = self.pids.to(device)
+        if self.images is not None:
+            self.images = self.images.to(device)
+        if self.caption_input_ids is not None:
+            self.caption_input_ids = self.caption_input_ids.to(device)
+        if self.caption_attention_mask is not None:
+            self.caption_attention_mask = self.caption_attention_mask.to(device)
+        return self
+
+
+@dataclass
+class MetricsContainer:
+    """Container for storing metrics data"""
+
+    text_ids: List[torch.Tensor] = field(default_factory=list)
+    image_ids: List[torch.Tensor] = field(default_factory=list)
+    text_feats: List[torch.Tensor] = field(default_factory=list)
+    image_feats: List[torch.Tensor] = field(default_factory=list)
+
+    def clear(self) -> None:
+        """Clear all stored metrics data"""
+        self.text_ids.clear()
+        self.image_ids.clear()
+        self.text_feats.clear()
+        self.image_feats.clear()
+
+    def concatenate(
+        self,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Concatenate all stored tensors"""
+        return (
+            torch.cat(self.text_ids),
+            torch.cat(self.image_ids),
+            torch.cat(self.text_feats),
+            torch.cat(self.image_feats),
+        )
+
+
+class ModelException(Exception):
+    """Custom exception for model-related errors"""
+
+    pass
 
 
 class LitTBPS(L.LightningModule):
@@ -28,145 +94,149 @@ class LitTBPS(L.LightningModule):
         num_classes=11003,
     ):
         super().__init__()
-        self.config = config
-        self.save_hyperparameters()
 
+        self.save_hyperparameters()
+        self.config = config
+        # Initialize model components
+        try:
+            self._initialize_model(
+                vocab_size, pad_token_id, num_classes, num_iters_per_epoch
+            )
+        except Exception as e:
+            raise ModelException(f"Failed to initialize model: {str(e)}")
+
+        # Initialize state
+        self._initialize_state()
+
+    ############# INITIALIZATION FUNCTIONS #############
+    def _initialize_model(
+        self,
+        vocab_size: int,
+        pad_token_id: int,
+        num_classes: int,
+        num_iters_per_epoch: int,
+    ) -> None:
+        """Initialize model components and configuration"""
+        self.num_iters_per_epoch = (
+            num_iters_per_epoch // self.config.trainer.accumulate_grad_batches
+        )
+
+        # Build model components
         self.backbone = build_backbone_with_proper_layer_resize(self.config.backbone)
         self.model = TBPS(
-            config=config,
+            config=self.config,
             backbone=self.backbone,
             vocab_size=vocab_size,
             pad_token_id=pad_token_id,
             num_classes=num_classes,
         )
-        self.num_iters_per_epoch = (
-            num_iters_per_epoch // self.config.trainer.accumulate_grad_batches
-        )
-        self.validation_step_outputs = {
-            "text_ids": [],
-            "image_ids": [],
-            "text_feats": [],
-            "image_feats": [],
-        }
-        self.test_img_data = []
-        self.test_txt_data = []
 
-    def training_step(self, batch, batch_idx):
-        # Get the current epoch
-        epoch = self.trainer.current_epoch
-        step = self.trainer.global_step
+    def _initialize_state(self) -> None:
+        """Initialize model state containers"""
+        self.metrics_container = MetricsContainer()
+        self.test_img_data: List[ModelSample] = []
+        self.test_txt_data: List[ModelSample] = []
+        self.test_final_outputs: List[Dict] = []
+
+    ############# INFERENCE FUNCTIONS #############
+    def get_image_features(
+        self, image: torch.Tensor, return_last_hidden: bool = False
+    ) -> torch.Tensor:
+        """
+        Get image features using the model
+
+        Args:
+            image: Input image tensor
+            return_last_hidden: Whether to return last hidden state
+
+        Returns:
+            Image features tensor
+        """
+        try:
+            return self.model.encode_image(image, return_last_hidden)
+        except Exception as e:
+            raise ModelException(f"Failed to extract image features: {str(e)}")
+
+    def get_text_features(
+        self, caption_input: Dict[str, torch.Tensor], return_last_hidden: bool = False
+    ) -> torch.Tensor:
+        """
+        Get text features using the model
+
+        Args:
+            caption_input: Dictionary containing input_ids and attention_mask
+            return_last_hidden: Whether to return last hidden state
+
+        Returns:
+            Text features tensor
+        """
+        try:
+            return self.model.encode_text(caption_input, return_last_hidden)
+        except Exception as e:
+            raise ModelException(f"Failed to extract text features: {str(e)}")
+
+    ############# END INFERENCE FUNCTIONS #############
+
+    ############# TRAINING FUNCTIONS #############
+    def training_step(self, batch: Dict[str, Any], batch_idx: int) -> torch.Tensor:
+        """
+        Training step implementation
+
+        Args:
+            batch: Input batch dictionary
+            batch_idx: Batch index
+
+        Returns:
+            Loss tensor
+        """
+        try:
+            # Compute alpha for soft labels
+            epoch = self.trainer.current_epoch
+            alpha = self._compute_alpha(epoch)
+
+            ret = self.model(batch, alpha)
+            loss = sum(v for k, v in ret.items() if k.endswith("loss"))
+
+            # Log metrics
+            self._log_training_metrics(ret, alpha, loss, epoch, batch_idx)
+
+            return loss
+
+        except Exception as e:
+            logger.error(f"Error in training step: {str(e)}")
+            raise ModelException(f"Training step failed: {str(e)}")
+
+    def _compute_alpha(self, epoch: int) -> float:
+        """Compute alpha value for soft labels"""
         alpha = self.config.loss.softlabel_ratio
         if epoch == 0:
+            step = self.trainer.global_step
             alpha *= min(1.0, step / self.num_iters_per_epoch)
+        return alpha
 
-        ret = self.model(batch, alpha)
-        loss = sum([ret[k] for k in ret if k.endswith("loss")])
+    def _log_training_metrics(
+        self,
+        ret: Dict[str, torch.Tensor],
+        alpha: float,
+        loss: torch.Tensor,
+        epoch: int,
+        batch_idx: int,
+    ) -> None:
+        """Log training metrics"""
+        # Log individual losses
+        for k, v in ret.items():
+            if k.endswith("loss"):
+                self.log(k, v, on_step=True, on_epoch=True, prog_bar=False)
 
-        # Logging and show in progress bar
-        self.log_dict(ret, on_step=True, on_epoch=True, prog_bar=False)
-        self.log("softlabel_ratio", alpha, on_step=True, on_epoch=False, prog_bar=True)
-        self.log("total_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
-
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        if batch["img"]:
-            pid = batch["img"]["pids"]
-            img = batch["img"]["images"]
-            img_feat = self.model.encode_image(img)
-            self.validation_step_outputs["image_ids"].append(pid.view(-1))  # flatten
-            self.validation_step_outputs["image_feats"].append(img_feat)
-
-        if batch["txt"]:
-            pid = batch["txt"]["pids"]
-            caption_input = {
-                "input_ids": batch["txt"]["caption_input_ids"],
-                "attention_mask": batch["txt"]["caption_attention_mask"],
-            }
-            text_feat = self.model.encode_text(caption_input)
-            self.validation_step_outputs["text_ids"].append(pid.view(-1))  # flatten
-            self.validation_step_outputs["text_feats"].append(text_feat)
-
-    def on_validation_epoch_end(self):
-        logging.info("Validation epoch end")
-        columns = ["task", "R1", "R5", "R10", "mAP", "mINP"]
-        table = PrettyTable(columns)
-
-        image_ids = torch.cat(self.validation_step_outputs["image_ids"], 0)
-        image_feats = torch.cat(self.validation_step_outputs["image_feats"], 0)
-        text_ids = torch.cat(self.validation_step_outputs["text_ids"], 0)
-        text_feats = torch.cat(self.validation_step_outputs["text_feats"], 0)
-
-        similarity = text_feats @ image_feats.t()
-
-        t2i_cmc, t2i_mAP, t2i_mINP, _ = rank(
-            similarity=similarity,
-            q_pids=text_ids,
-            g_pids=image_ids,
-            max_rank=10,
-            get_mAP=True,
-        )
-        t2i_cmc, t2i_mAP, t2i_mINP = (
-            t2i_cmc.tolist(),
-            t2i_mAP.tolist(),
-            t2i_mINP.tolist(),
-        )
-
-        i2t_cmc, i2t_mAP, i2t_mINP, _ = rank(
-            similarity=similarity.t(),
-            q_pids=image_ids,
-            g_pids=text_ids,
-            max_rank=10,
-            get_mAP=True,
-        )
-        i2t_cmc, i2t_mAP, i2t_mINP = (
-            i2t_cmc.tolist(),
-            i2t_mAP.tolist(),
-            i2t_mINP.tolist(),
-        )
-
-        data = [
-            ["t2i", t2i_cmc[0], t2i_cmc[4], t2i_cmc[9], t2i_mAP, t2i_mINP],
-            ["i2t", i2t_cmc[0], i2t_cmc[4], i2t_cmc[9], i2t_mAP, i2t_mINP],
-        ]
-
-        for row in data:
-            table.add_row(row)
-
-        results = {
-            "t2i_R1": t2i_cmc[0],
-            "t2i_R5": t2i_cmc[4],
-            "t2i_R10": t2i_cmc[9],
-            "t2i_mAP": t2i_mAP,
-            "t2i_mINP": t2i_mINP,
-            "i2t_R1": i2t_cmc[0],
-            "i2t_R5": i2t_cmc[4],
-            "i2t_R10": i2t_cmc[9],
-            "i2t_mAP": i2t_mAP,
-            "i2t_mINP": i2t_mINP,
+        # Log overall metrics
+        metrics = {
+            "softlabel_ratio": alpha,
+            "total_loss": loss,
         }
+        self.log_dict(metrics, on_step=True, on_epoch=True, prog_bar=True)
 
-        self.log_dict(results, on_step=False, on_epoch=True, prog_bar=False)
-        self.log(
-            "eval_score", results["t2i_R1"], on_step=False, on_epoch=True, prog_bar=True
-        )
-        logging.info("\n" + str(table))
-
-        # Logging the results to wandb
-        # if self.config.logger.logger_type == "wandb":
-        #     self.logger.log_table(key="validation_results", columns=columns, data=data)
-
-        # Reset the outputs
-        self.validation_step_outputs = {
-            "text_ids": [],
-            "image_ids": [],
-            "text_feats": [],
-            "image_feats": [],
-        }
-
-        # Clean up the memory
-        del image_ids, image_feats, text_ids, text_feats, similarity
-        del t2i_cmc, t2i_mAP, t2i_mINP, i2t_cmc, i2t_mAP, i2t_mINP
+        if epoch == 0 and batch_idx == 0:
+            logger.info(f"Initial loss: {loss.item():.4f}")
 
     def configure_optimizers(self):
         optimizer = build_optimizer(self.config.optimizer, self.model)
@@ -187,93 +257,250 @@ class LitTBPS(L.LightningModule):
         all_norms = norms[f"grad_{float(2)}_norm_total"]
         self.log("grad_norm", all_norms, on_step=True, on_epoch=True, prog_bar=True)
 
-    def test_step(self, batch, batch_idx, dataloader_idx):
-        # 0 is image, 1 is text
-        if dataloader_idx == 0:
-            pids = batch["pids"]
-            imgs = batch["images"]
-            self.test_img_data.extend(
-                [
-                    {k: v[i].to("cpu") for k, v in batch.items()}
-                    for i in range(len(batch["images"]))
-                ]
-            )
-            img_feat = self.model.encode_image(imgs)
-            self.validation_step_outputs["image_ids"].append(pids.view(-1))  # flatten
-            self.validation_step_outputs["image_feats"].append(img_feat)
+    ############# END TRAINING FUNCTIONS #############
 
-        elif dataloader_idx == 1:
-            pids = batch["pids"]
-            caption_inputs = {
-                "input_ids": batch["caption_input_ids"],
-                "attention_mask": batch["caption_attention_mask"],
-            }
-            self.test_txt_data.extend(
-                [
-                    {k: v[i].to("cpu") for k, v in batch.items()}
-                    for i in range(len(batch["caption_input_ids"]))
-                ]
-            )
-            text_feat = self.model.encode_text(caption_inputs)
-            self.validation_step_outputs["text_ids"].append(pids.view(-1))  # flatten
-            self.validation_step_outputs["text_feats"].append(text_feat)
+    ############ METRICS FUNCTIONS ############
+    def _compute_metrics(
+        self,
+        return_indices: bool = True,
+    ) -> Dict[str, Dict[str, float]]:
+        """Compute evaluation metrics"""
+        text_ids, image_ids, text_feats, image_feats = (
+            self.metrics_container.concatenate()
+        )
 
-    def on_test_epoch_end(self):
-        image_ids = torch.cat(self.validation_step_outputs["image_ids"], 0)
-        image_feats = torch.cat(self.validation_step_outputs["image_feats"], 0)
-        text_ids = torch.cat(self.validation_step_outputs["text_ids"], 0)
-        text_feats = torch.cat(self.validation_step_outputs["text_feats"], 0)
+        # Compute similarities
+        t2i_similarity = torch.matmul(text_feats, image_feats.t())
+        i2t_similarity = t2i_similarity.t()
 
-        similarity = text_feats @ image_feats.t()
-        _, _, _, indices = rank(
+        # Calculate metrics for both directions
+        t2i_metrics, indices = self._compute_ranking_metrics(
+            t2i_similarity, text_ids, image_ids, return_indices
+        )
+        i2t_metrics, indices = self._compute_ranking_metrics(
+            i2t_similarity, image_ids, text_ids, return_indices
+        )
+
+        return {
+            "t2i": t2i_metrics,
+            "i2t": i2t_metrics,
+        }, indices if return_indices else None
+
+    @staticmethod
+    def _compute_ranking_metrics(
+        similarity: torch.Tensor,
+        query_ids: torch.Tensor,
+        gallery_ids: torch.Tensor,
+        return_indices: bool = True,
+    ) -> Dict[str, float]:
+        """Compute ranking metrics"""
+        cmc, mAP, mINP, indices = rank(
             similarity=similarity,
-            q_pids=text_ids,
-            g_pids=image_ids,
+            q_pids=query_ids,
+            g_pids=gallery_ids,
             max_rank=10,
             get_mAP=True,
         )
-        wrong_predictions = self._get_wrong_predictions(
-            indices, self.test_img_data, self.test_txt_data
-        )
-        del self.test_img_data, self.test_txt_data
-        self.test_final_outputs = wrong_predictions
 
-    def _get_wrong_predictions(self, indices, test_img_data, test_txt_data):
+        return {
+            "R1": cmc[0].item(),
+            "R5": cmc[4].item(),
+            "R10": cmc[9].item(),
+            "mAP": mAP.item(),
+            "mINP": mINP.item(),
+        }, indices if return_indices else None
+
+    def _log_metrics(self, results: Dict[str, Dict[str, float]], phase: str) -> None:
+        """Log metrics results"""
+        # Create results table
+        table = PrettyTable(["Task", "R1", "R5", "R10", "mAP", "mINP"])
+
+        # Add results and log metrics
+        for task, metrics in results.items():
+            # Add to table
+            row = [task] + [f"{v:.2f}" for v in metrics.values()]
+            table.add_row(row)
+
+            # Log individual metrics
+            for name, value in metrics.items():
+                self.log(f"{phase}_{task}_{name}", value, on_epoch=True)
+
+        # Log overall score
+        self.log(f"{phase}_score", results["t2i"]["R1"], on_epoch=True, prog_bar=True)
+
+        # Print table
+        logger.info(f"\n{phase.capitalize()} Results:\n{table}")
+
+    ############# END METRICS FUNCTIONS #############
+
+    ############# VALIDATION FUNCTIONS #############
+    def validation_step(self, batch: Dict[str, Any], batch_idx: int) -> None:
+        """Validation step implementation"""
+        try:
+            self._process_features(batch, DataType.IMAGE)
+            self._process_features(batch, DataType.TEXT)
+        except Exception as e:
+            logger.error(f"Error in validation step: {str(e)}")
+            raise ModelException(f"Validation step failed: {str(e)}")
+
+    def _process_features(
+        self,
+        batch: Dict[str, Any],
+        data_type: DataType,
+    ) -> None:
+        """Process features for either image or text data"""
+        if data_type == DataType.IMAGE and batch.get("img"):
+            pid = batch["img"]["pids"]
+            img_feat = self.model.encode_image(batch["img"]["images"])
+            self.metrics_container.image_ids.append(pid.flatten())
+            self.metrics_container.image_feats.append(img_feat)
+
+        elif data_type == DataType.TEXT and batch.get("txt"):
+            pid = batch["txt"]["pids"]
+            caption_input = {
+                "input_ids": batch["txt"]["caption_input_ids"],
+                "attention_mask": batch["txt"]["caption_attention_mask"],
+            }
+            text_feat = self.model.encode_text(caption_input)
+            self.metrics_container.text_ids.append(pid.flatten())
+            self.metrics_container.text_feats.append(text_feat)
+
+    def on_validation_epoch_start(self) -> None:
+        """Initialize validation data containers"""
+        self.metrics_container.clear()
+
+    def on_validation_epoch_end(self) -> None:
+        """Process validation results at epoch end and cleaning up"""
+        try:
+            results, _ = self._compute_metrics(return_indices=False)
+            self._log_metrics(results, "val")
+            self.metrics_container.clear()
+            torch.cuda.empty_cache()
+        except Exception as e:
+            logger.error(f"Error in validation epoch end: {str(e)}")
+            raise ModelException(f"Validation epoch end failed: {str(e)}")
+
+    ############# TEST TIME RELATED FUNCTIONS #############
+    def test_step(
+        self, batch: Dict[str, Any], batch_idx: int, dataloader_idx: int
+    ) -> None:
+        """Process test batch which is sequentialy built for image and text data
+        Dataloader index is used to differentiate between image (0) and text data (1)"""
+        try:
+            if dataloader_idx == 0:
+                self._process_test_image_batch(batch)
+            else:
+                self._process_test_text_batch(batch)
+        except Exception as e:
+            logger.error(f"Error in test step: {str(e)}")
+            raise ModelException(f"Test step failed: {str(e)}")
+
+    def _process_test_image_batch(self, batch: Dict[str, Any]) -> None:
+        """Process test image batch"""
+        # Store CPU data
+        self.test_img_data.extend(
+            [
+                ModelSample(
+                    pids=batch["pids"][i].cpu(),
+                    images=batch["images"][i].cpu(),
+                )
+                for i in range(len(batch["images"]))
+            ]
+        )
+
+        # Process features
+        img_feat = self.model.encode_image(batch["images"])
+        self.metrics_container.image_ids.append(batch["pids"].flatten())
+        self.metrics_container.image_feats.append(img_feat)
+
+    def _process_test_text_batch(self, batch: Dict[str, Any]) -> None:
+        """Process test text batch"""
+        # Store CPU data
+        self.test_txt_data.extend(
+            [
+                ModelSample(
+                    pids=batch["pids"][i].cpu(),
+                    caption_input_ids=batch["caption_input_ids"][i].cpu(),
+                    caption_attention_mask=batch["caption_attention_mask"][i].cpu(),
+                )
+                for i in range(len(batch["caption_input_ids"]))
+            ]
+        )
+
+        # Process features
+        caption_inputs = {
+            "input_ids": batch["caption_input_ids"],
+            "attention_mask": batch["caption_attention_mask"],
+        }
+        text_feat = self.model.encode_text(caption_inputs)
+        self.metrics_container.text_ids.append(batch["pids"].flatten())
+        self.metrics_container.text_feats.append(text_feat)
+
+    def _process_wrong_predictions(self, indices: torch.Tensor) -> List[Dict]:
+        """Process wrong predictions efficiently"""
         wrong_predictions = []
 
-        for query_id in range(indices.shape[0]):
-            true_person_ids = test_txt_data[query_id]["pids"]
-            predicted_image_ids = indices[query_id][:10]
-            predicted_person_ids = [
-                test_img_data[idx]["pids"].tolist() for idx in predicted_image_ids
+        # Find wrong predictions
+        for query_idx, pred_indices in enumerate(indices):
+            true_pid = self.test_txt_data[query_idx].pids.item()
+            pred_pids = [
+                self.test_img_data[idx].pids.item() for idx in pred_indices[:10]
             ]
 
-            if predicted_person_ids[0] != true_person_ids:
-                row = {"query": test_txt_data[query_id]["caption_input_ids"]}
-                # Just store the tensors directly
-                for i, img_id in enumerate(predicted_image_ids):
-                    row[f"img_{i+1}"] = {
-                        "image": test_img_data[img_id]["images"],
-                        "pid": predicted_person_ids[i],
-                    }
-                # Find an image with the correct person id
-                for sample in test_img_data:
-                    if sample["pids"] == true_person_ids:
-                        row["correct_img"] = {
-                            "image": sample["images"],
-                            "pid": true_person_ids,
+            # Check if the first prediction is correct
+            if pred_pids[0] != true_pid:
+                prediction = {
+                    "query": self.test_txt_data[query_idx].caption_input_ids,
+                    "predictions": [
+                        {
+                            "image": self.test_img_data[idx].images,
+                            "pid": pid,
                         }
-                        break
-                wrong_predictions.append(row)
+                        for idx, pid in zip(pred_indices[:10], pred_pids)
+                    ],
+                }
 
-        # Clean up the memory
-        del (
-            test_img_data,
-            test_txt_data,
-            indices,
-            true_person_ids,
-            predicted_image_ids,
-            predicted_person_ids,
-        )
+                # Find correct image and pid
+                correct_img = next(
+                    (
+                        sample
+                        for sample in self.test_img_data
+                        if sample.pids.item() == true_pid
+                    ),
+                    None,
+                )
+                if correct_img:
+                    prediction["correct_img"] = {
+                        "image": correct_img.images,
+                        "pid": true_pid,
+                    }
+
+                wrong_predictions.append(prediction)
 
         return wrong_predictions
+
+    def on_test_epoch_start(self) -> None:
+        """Initialize test data containers"""
+        self.test_img_data.clear()
+        self.test_txt_data.clear()
+        self.metrics_container.clear()
+
+    def on_test_epoch_end(self) -> None:
+        """Process test results"""
+        try:
+            # Compute metrics
+            results, indices = self._compute_metrics(return_indices=True)
+            self._log_metrics(results, "test")
+
+            # Process wrong predictions
+            self.test_final_outputs = self._process_wrong_predictions(indices)
+
+            # Cleanup
+            self.test_img_data.clear()
+            self.test_txt_data.clear()
+            self.metrics_container.clear()
+            torch.cuda.empty_cache()
+
+        except Exception as e:
+            logger.error(f"Error in test epoch end: {str(e)}")
+            raise ModelException(f"Test epoch end failed: {str(e)}")

@@ -68,6 +68,8 @@ class PreloadedDataset(Dataset):
         truncate: bool = True,
         image_size: Tuple[int, int] = (384, 128),
         is_train: bool = True,
+        mean: Tuple[float, float, float] = (0.485, 0.456, 0.406),
+        std: Tuple[float, float, float] = (0.229, 0.224, 0.225),
     ):
         """
         Base class for all datasets that are preloaded into memory
@@ -96,9 +98,13 @@ class PreloadedDataset(Dataset):
         self.truncate = truncate
         self.image_size = image_size
         self.is_train = is_train
+        self.mean = mean
+        self.std = std
 
         if self.ss_aug:
-            self.ss_image_transform = get_self_supervised_augmentation(self.image_size)
+            self.ss_image_transform = get_self_supervised_augmentation(
+                self.image_size, self.mean, self.std
+            )
 
     def __len__(self):
         return len(self.dataset)
@@ -107,6 +113,8 @@ class PreloadedDataset(Dataset):
         self.current_img_transforms = get_image_transform(
             aug_pool=self.image_augmentation_pool,
             size=self.image_size,
+            mean=self.mean,
+            std=self.std,
             k=self.image_random_k,
             is_train=self.is_train,
         )
@@ -279,6 +287,7 @@ class TextDataset(PreloadedDataset):
 
         ret = {
             "pids": caption_pids,
+            "text": caption,
         }
 
         for key, value in tokens.items():

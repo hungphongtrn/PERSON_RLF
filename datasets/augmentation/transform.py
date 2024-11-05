@@ -15,11 +15,8 @@ from utils.parse_module_str import parse_module_str
 
 logger = logging.getLogger(__name__)
 
-MEAN = [0.485, 0.456, 0.406]
-STD = [0.229, 0.224, 0.225]
 
-
-def get_self_supervised_augmentation(img_size):
+def get_self_supervised_augmentation(img_size, mean, std):
     class GaussianBlur(object):
         """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
 
@@ -31,9 +28,7 @@ def get_self_supervised_augmentation(img_size):
             x = x.filter(ImageFilter.GaussianBlur(radius=sigma))
             return x
 
-    normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-    )
+    normalize = transforms.Normalize(mean=mean, std=std)
 
     aug = transforms.Compose(
         [
@@ -57,6 +52,8 @@ def get_self_supervised_augmentation(img_size):
 def get_image_transform(
     aug_pool,
     size: Tuple[int, int] = (384, 128),
+    mean: Tuple[float, float, float] = (0.485, 0.456, 0.406),
+    std: Tuple[float, float, float] = (0.229, 0.224, 0.225),
     k: int = 2,
     is_train: bool = True,
 ) -> transforms.Compose:
@@ -80,9 +77,7 @@ def get_image_transform(
         "Rescale",
     ]
     if not is_train or not aug_pool:
-        normalize = transforms.Normalize(
-            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-        )
+        normalize = transforms.Normalize(mean=mean, std=std)
         transform = transforms.Compose(
             [transforms.Resize(size), transforms.ToTensor(), normalize]
         )
@@ -91,10 +86,12 @@ def get_image_transform(
     if k == -1:
         return transforms.Compose(aug_pool)
 
-    # Randomly select k augmentations from the pool excluding Resize, ToTensor, Normalize
-    aug_choice = np.random.choice(
-        [aug for aug in aug_pool if aug.__class__.__name__ not in EXCLUDING], k
-    )
+    # Randomly select k augmentations from the pool excluding Resize, ToTensor, Normalize, PILResize, Rescale
+    random_pool = [aug for aug in aug_pool if aug.__class__.__name__ not in EXCLUDING]
+    if k > len(random_pool):
+        k = len(random_pool)
+    aug_choice = np.random.choice(random_pool, k)
+
     # Combine selected augmentations with Resize, ToTensor, Normalize, retaining the order
     image_aug = [
         aug
@@ -118,6 +115,7 @@ def build_image_aug_pool(augment_cfg: dict = None):
             except TypeError as e:
                 raise TypeError(f"Augmentation {aug_type} requires parameters: {e}")
             additional_aug.append(aug)
+        logger.info(f"Using image augmentation: {additional_aug} for training.")
         return additional_aug
 
     return None

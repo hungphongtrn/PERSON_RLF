@@ -61,6 +61,8 @@ class TBPSDataModule(pl.LightningDataModule):
             self.ss_aug = True
         else:
             self.ss_aug = None
+        self.mean = self.config.aug.img.mean
+        self.std = self.config.aug.img.std
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
@@ -76,6 +78,8 @@ class TBPSDataModule(pl.LightningDataModule):
                     truncate=True,
                     image_size=self.config.aug.img.size,
                     is_train=True,
+                    mean=self.mean,
+                    std=self.std,
                 )
             else:
                 self.train_set = ImageTextDataset(
@@ -89,6 +93,8 @@ class TBPSDataModule(pl.LightningDataModule):
                     truncate=True,
                     image_size=self.config.aug.img.size,
                     is_train=True,
+                    mean=self.mean,
+                    std=self.std,
                 )
 
             if self.config.dataset.proportion:
@@ -103,23 +109,27 @@ class TBPSDataModule(pl.LightningDataModule):
                     f"Using {self.config.dataset.proportion} of the training set"
                 )
 
-            if self.dataset.val:
-                logger.info("Validation set is available")
-                self.val_img_set = ImageDataset(
-                    dataset=self.dataset.val,
-                    is_train=False,
-                    image_size=self.config.aug.img.size,
-                )
-                self.val_txt_set = TextDataset(
-                    dataset=self.dataset.val,
-                    tokenizer=self.tokenizer,
-                    is_train=False,
-                )
+            logger.info("Validation set is available")
+            self.val_img_set = ImageDataset(
+                dataset=self.dataset.val,
+                is_train=False,
+                image_size=self.config.aug.img.size,
+                mean=self.mean,
+                std=self.std,
+            )
+            self.val_txt_set = TextDataset(
+                dataset=self.dataset.val,
+                tokenizer=self.tokenizer,
+                is_train=False,
+            )
 
         if stage == "test" or stage is None:
             self.test_img_set = ImageDataset(
                 dataset=self.dataset.test,
                 image_size=self.config.aug.img.size,
+                is_train=False,
+                mean=self.mean,
+                std=self.std,
             )
             self.test_txt_set = TextDataset(
                 dataset=self.dataset.test,

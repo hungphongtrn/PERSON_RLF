@@ -232,6 +232,8 @@ class LitTBPS(L.LightningModule):
         metrics = {
             "softlabel_ratio": alpha,
             "total_loss": loss,
+            "temperature": ret["temperature"],
+            "bias": ret["bias"]
         }
         self.log_dict(metrics, on_step=True, on_epoch=True, prog_bar=True)
 
@@ -262,7 +264,7 @@ class LitTBPS(L.LightningModule):
     ############ METRICS FUNCTIONS ############
     def _compute_metrics(
         self,
-        return_indices: bool = True,
+        return_ranking: bool = True,
     ) -> Dict[str, Dict[str, float]]:
         """Compute evaluation metrics"""
         text_ids, image_ids, text_feats, image_feats = (
@@ -274,27 +276,30 @@ class LitTBPS(L.LightningModule):
         i2t_similarity = t2i_similarity.t()
 
         # Calculate metrics for both directions
-        t2i_metrics, indices = self._compute_ranking_metrics(
-            t2i_similarity, text_ids, image_ids, return_indices
+        t2i_metrics, t2i_ranking = self._compute_ranking_metrics(
+            t2i_similarity, text_ids, image_ids, return_ranking
         )
-        i2t_metrics, indices = self._compute_ranking_metrics(
-            i2t_similarity, image_ids, text_ids, return_indices
+        i2t_metrics, i2t_ranking = self._compute_ranking_metrics(
+            i2t_similarity, image_ids, text_ids, return_ranking
         )
 
         return {
             "t2i": t2i_metrics,
             "i2t": i2t_metrics,
-        }, indices if return_indices else None
+        }, {
+            "t2i": t2i_ranking,
+            "i2t": i2t_ranking,
+        }
 
     @staticmethod
     def _compute_ranking_metrics(
         similarity: torch.Tensor,
         query_ids: torch.Tensor,
         gallery_ids: torch.Tensor,
-        return_indices: bool = True,
+        return_ranking: bool = True,
     ) -> Dict[str, float]:
         """Compute ranking metrics"""
-        cmc, mAP, mINP, indices = rank(
+        cmc, mAP, mINP, ranking = rank(
             similarity=similarity,
             q_pids=query_ids,
             g_pids=gallery_ids,
@@ -308,7 +313,7 @@ class LitTBPS(L.LightningModule):
             "R10": cmc[9].item(),
             "mAP": mAP.item(),
             "mINP": mINP.item(),
-        }, indices if return_indices else None
+        }, ranking if return_ranking else None
 
     def _log_metrics(self, results: Dict[str, Dict[str, float]], phase: str) -> None:
         """Log metrics results"""
@@ -372,7 +377,7 @@ class LitTBPS(L.LightningModule):
     def on_validation_epoch_end(self) -> None:
         """Process validation results at epoch end and cleaning up"""
         try:
-            results, _ = self._compute_metrics(return_indices=False)
+            results, _ = self._compute_metrics(return_ranking=False)
             self._log_metrics(results, "val")
             self.metrics_container.clear()
             torch.cuda.empty_cache()
@@ -436,15 +441,15 @@ class LitTBPS(L.LightningModule):
         self.metrics_container.text_ids.append(batch["pids"].flatten())
         self.metrics_container.text_feats.append(text_feat)
 
-    def _process_wrong_predictions(self, indices: torch.Tensor) -> List[Dict]:
+    def _process_wrong_predictions(self, ranking: torch.Tensor) -> List[Dict]:
         """Process wrong predictions efficiently"""
         wrong_predictions = []
 
         # Find wrong predictions
-        for query_idx, pred_indices in enumerate(indices):
+        for query_idx, pred_ranking in enumerate(ranking):
             true_pid = self.test_txt_data[query_idx].pids.item()
             pred_pids = [
-                self.test_img_data[idx].pids.item() for idx in pred_indices[:10]
+                self.test_img_data[idx].pids.item() for idx in pred_ranking[:10]
             ]
 
             # Check if the first prediction is correct
@@ -456,7 +461,7 @@ class LitTBPS(L.LightningModule):
                             "image": self.test_img_data[idx].images,
                             "pid": pid,
                         }
-                        for idx, pid in zip(pred_indices[:10], pred_pids)
+                        for idx, pid in zip(pred_ranking[:10], pred_pids)
                     ],
                 }
 
@@ -489,11 +494,12 @@ class LitTBPS(L.LightningModule):
         """Process test results"""
         try:
             # Compute metrics
-            results, indices = self._compute_metrics(return_indices=True)
+            results, ranking = self._compute_metrics(return_ranking=True)
             self._log_metrics(results, "test")
 
-            # Process wrong predictions
-            self.test_final_outputs = self._process_wrong_predictions(indices)
+            # Process wrong predictions for text-to-image ranking only
+            t2i_ranking = ranking["t2i"]
+            self.test_final_outputs = self._process_wrong_predictions(t2i_ranking)
 
             # Cleanup
             self.test_img_data.clear()
@@ -504,3 +510,5 @@ class LitTBPS(L.LightningModule):
         except Exception as e:
             logger.error(f"Error in test epoch end: {str(e)}")
             raise ModelException(f"Test epoch end failed: {str(e)}")
+
+    ############# END TEST TIME RELATED FUNCTIONS #############

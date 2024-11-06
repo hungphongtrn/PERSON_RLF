@@ -27,53 +27,18 @@ class TBPS(nn.Module):
         self.text_model = backbone.text_model
         self.embed_dim = config.backbone.embedding_dim
 
-        if config.backbone.freeze_backbone:
+        if config.backbone.freeze.vision:
             for param in self.vision_model.parameters():
                 param.requires_grad = False
+            logger.info("Freezing vision backbone")
+        if config.backbone.freeze.text:
             for param in self.text_model.parameters():
                 param.requires_grad = False
-            logger.info("Freezing backbone")
+            logger.info("Freezing text backbone")
 
         self.use_sigmoid = config.backbone.use_sigmoid
-
-        self.logit_scale = nn.Parameter(
-            torch.ones([])
-        )  # Trainable parameter for scaling logits
-        # Use the default value for logit scale if not provided
-
-        if config.backbone.pre_log_logit_scale_init:
-            nn.init.constant_(
-                self.logit_scale, np.log(config.backbone.pre_log_logit_scale_init)
-            )
-            logger.info(
-                f"Initializing logit_scale with log of {config.backbone.pre_log_logit_scale_init}"
-            )
-        else:
-            nn.init.constant_(
-                self.logit_scale, np.log(1 / 0.07)
-            )  # 1/0.07 is the default value
-            logger.info("Initializing logit_scale with log of 1/0.07")
-
-        if self.use_sigmoid and config.backbone.logit_bias_init:
-            self.logit_bias = nn.Parameter(torch.ones([]))
-            nn.init.constant_(self.logit_bias, config.backbone.logit_bias_init)
-            logger.info(
-                f"Initializing logit bias with {config.backbone.logit_bias_init}"
-            )
-        else:
-            self.logit_bias = None
-            logger.info("Not using sigmoid, logit bias is not needed")
-
-        # ### EXPERIMENT ONLY
-        # # Freeze logit scale
-        # self.logit_scale.requires_grad = False
-        # logger.info("Freezing logit scale")
-
-        # # # Freeze logit bias
-        # # if self.use_sigmoid:
-        # #     self.logit_bias.requires_grad = False
-        # #     logger.info("Freezing logit bias")
-        # ### DELETE LATER
+        if not self.backbone.logit_bias:
+            self.backbone.logit_bias = 0
 
         task_lists = []
         for task in TASK_LIST:
@@ -273,10 +238,8 @@ class TBPS(nn.Module):
 
         images = batch["images"]
 
-        logit_scale = self.logit_scale.exp()
-        # Clamp the logit scale to prevent numerical instability if not using sigmoid
-        if not self.use_sigmoid:
-            logit_scale.data = torch.clamp(logit_scale.data, max=100)
+        logit_scale = self.backbone.logit_scale.exp()
+        logit_scale.data = torch.clamp(logit_scale.data, max=100)
 
         if self.config.loss.get("MLM", None):
             image_pooler_output, image_last_hidden = self.encode_image(images, True)
@@ -284,9 +247,9 @@ class TBPS(nn.Module):
             image_pooler_output = self.encode_image(images)
         caption_pooler_output = self.encode_text(caption_input)
 
-        ret.update({"temperature": logit_scale})
-        if self.logit_bias:
-            ret.update({"bias": self.logit_bias})
+        ret.update({"temperature": self.backbone.logit_scale})
+        if self.backbone.logit_bias:
+            ret.update({"bias": self.backbone.logit_bias})
 
         # Improve data efficiency with SimCLR
         if self.config.loss.get("SS", None):
@@ -319,8 +282,8 @@ class TBPS(nn.Module):
                 sim_targets=sim_targets,
                 alpha=alpha,
                 logit_scale=logit_scale,
+                logit_bias=self.backbone.logit_bias,
                 use_sigmoid=self.use_sigmoid,
-                logit_bias=self.logit_bias,
             )
             if self.config.loss.get("MVS", None):
                 aug_images = batch["aug_images"]
@@ -338,7 +301,7 @@ class TBPS(nn.Module):
                     alpha=alpha,
                     logit_scale=logit_scale,
                     use_sigmoid=self.use_sigmoid,
-                    logit_bias=self.logit_bias,
+                    logit_bias=self.backbone.logit_bias,
                 )
                 nitc_loss = (nitc_loss + augmented_nitc_loss) / 2
 
@@ -353,7 +316,7 @@ class TBPS(nn.Module):
                 self.config.loss.citc_inmodal_weight,
                 self.config.loss.citc_intermodal_weight,
                 self.use_sigmoid,
-                self.logit_bias,
+                self.backbone.logit_bias,
             )
             ret.update({"citc_loss": loss * self.config.loss.citc_loss_weight})
 
@@ -370,7 +333,7 @@ class TBPS(nn.Module):
                 sim_targets,
                 self.config.loss.ritc_eps,
                 self.use_sigmoid,
-                self.logit_bias,
+                self.backbone.logit_bias,
             )
             ret.update({"ritc_loss": loss * self.config.loss.ritc_loss_weight})
 

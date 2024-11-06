@@ -15,4 +15,6 @@ embedding_dim: 768
 use_sigmoid: true
 pre_log_logit_scale_init: 4.7095
 logit_bias_init: -12.8853
-freeze_backbone: false
+freeze:
+  vision: false
+  text: false

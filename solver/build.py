@@ -1,4 +1,5 @@
 import logging
+from typing import Any, Dict, List
 
 from utils.parse_module_str import parse_module_str
 
@@ -7,7 +8,13 @@ logger = logging.getLogger(__name__)
 
 def build_optimizer(optimizer_cfg, model):
     """
-    Build optimizer.
+    Build optimizer with different parameter groups.
+    RULES:
+        - Default learning rate is set for backbone
+        - Other than backbone (newly initialized modules) will have different learning rate
+            - Cross attention modules will have higher learning rate (> default)
+            - Bias will have lower learning rate (> default)
+            - classifier will have higher learning rate (> default)
 
     Args:
         optimizer_cfg: solver configuration
@@ -17,96 +24,57 @@ def build_optimizer(optimizer_cfg, model):
     """
     modifiable_optimizer_cfg = optimizer_cfg.copy()
     # Create parameter groups and set learning rate for each group
-    lr = modifiable_optimizer_cfg.pop("lr")
-    lr_factor = modifiable_optimizer_cfg.pop("lr_factor")
-    bias_lr_factor = modifiable_optimizer_cfg.pop("bias_lr_factor")
-    weight_decay = modifiable_optimizer_cfg.pop("weight_decay")
-    weight_decay_bias = modifiable_optimizer_cfg.pop("weight_decay_bias")
 
-    param_groups = {
-        "default": {
-            "params": [],
-            "lr": lr,
-            "weight_decay": weight_decay,
-        },
-        "cross": {
-            "params": [],
-            "lr": lr * lr_factor,
-            "weight_decay": weight_decay,
-        },
-        "bias": {
-            "params": [],
-            "lr": lr * bias_lr_factor,
-            "weight_decay": weight_decay_bias,
-        },
-        "classifier": {
-            "params": [],
-            "lr": lr * lr_factor,
-            "weight_decay": weight_decay,
-        },
-    }
+    param_group_configs = modifiable_optimizer_cfg.param_groups
+    default_config = param_group_configs.pop("default", {})
 
-    logger.info(f"Using {lr_factor} times learning rate for random init module ")
+    # Initialize parameter groups
+    param_groups: List[Dict[str, Any]] = []
+    assigned_params = set()
 
-    for key, value in model.named_parameters():
-        if not value.requires_grad:
-            continue
+    # Create parameter groups based on config
+    for group_name, group_config in param_group_configs.items():
+        group_params = []
 
-        if "cross" in key:
-            group = "cross"
-        elif "bias" in key:
-            group = "bias"
-        elif "classifier" in key or "mlm_head" in key:
-            group = "classifier"
-        else:
-            group = "default"
+        # Iterate through all named parameters
+        for name, param in model.named_parameters():
+            # Skip if parameter does not require grad
+            if not param.requires_grad:
+                continue
 
-        param_groups[group]["params"].append(value)
+            # Skip if parameter already assigned
+            if id(param) in assigned_params:
+                continue
+
+            # Check if group name is partially included in parameter name
+            if group_name in name:
+                group_params.append(param)
+                assigned_params.add(id(param))
+
+        # Create parameter group if any parameters match
+        if group_params:
+            param_groups.append(
+                {"params": group_params, "name": group_name, **group_config}
+            )
+
+    # Create default group for remaining parameters
+    default_params = [
+        param for param in model.parameters() if id(param) not in assigned_params
+    ]
+    if default_params:
+        param_groups.append(
+            {"params": default_params, "name": "default", **default_config}
+        )
 
     # Remove empty groups
-    param_groups = [group for group in param_groups.values() if group["params"]]
+    param_groups = [group for group in param_groups if group["params"]]
 
     # Create optimizer
     optimizer_type = modifiable_optimizer_cfg.pop("type")
-    logger.info(f"Using {optimizer_type} optimizer")
     optimizer_cls = parse_module_str(optimizer_type)
-    optimizer = optimizer_cls(param_groups, **modifiable_optimizer_cfg)
+    optimizer = optimizer_cls(param_groups)
 
-    # if optimizer_cfg.optimizer == "SGD":
-    #     optimizer = torch.optim.SGD(param_groups, momentum=optimizer_cfg.momentum)
-    # elif optimizer_cfg.optimizer == "Adam":
-    #     optimizer = torch.optim.Adam(
-    #         param_groups,
-    #         betas=(optimizer_cfg.alpha, optimizer_cfg.beta),
-    #         eps=1e-3,
-    #     )
-    # elif optimizer_cfg.optimizer == "AdamW":
-    #     optimizer = torch.optim.AdamW(
-    #         param_groups,
-    #         betas=(optimizer_cfg.alpha, optimizer_cfg.beta),
-    #         eps=1e-8,
-    #     )
-    # elif optimizer_cfg.optimizer == "PagedAdamW32bit":
-    #     optimizer = bitsandbytes.optim.PagedAdamW32bit(
-    #         param_groups,
-    #         betas=(optimizer_cfg.alpha, optimizer_cfg.beta),
-    #         eps=1e-8,
-    #     )
-    # elif optimizer_cfg.optimizer == "PagedAdamW8bit":
-    #     optimizer = bitsandbytes.optim.PagedAdamW8bit(
-    #         param_groups,
-    #         betas=(optimizer_cfg.alpha, optimizer_cfg.beta),
-    #         eps=1e-8,
-    #     )
-    # elif optimizer_cfg.optimizer == "AdamW8bit":
-    #     optimizer = bitsandbytes.optim.AdamW8bit(
-    #         param_groups,
-    #         betas=(optimizer_cfg.alpha, optimizer_cfg.beta),
-    #         eps=1e-8,
-    #     )
-    # else:
-    #     raise NotImplementedError
-
+    logger.info(f"Using {optimizer_type} optimizer with information: {optimizer}")
     return optimizer
 
 
@@ -124,18 +92,3 @@ def build_lr_scheduler(scheduler_cfg, optimizer):
         optimizer, **modifiable_scheduler_cfg
     )
     return lr_scheduler
-
-
-# def build_lr_scheduler(optimizer_cfg, optimizer):
-#     return LRSchedulerWithWarmup(
-#         optimizer,
-# milestones=optimizer_cfg.milestones,
-# gamma=solver_cfg.gamma,
-# warmup_factor=solver_cfg.warmup_factor,
-# warmup_epochs=solver_cfg.warmup_epochs,
-# warmup_method=solver_cfg.warmup_method,
-# total_epochs=solver_cfg.num_epoch,
-# mode=solver_cfg.lrscheduler,
-# target_lr=solver_cfg.target_lr,
-# power=solver_cfg.power,
-#     )

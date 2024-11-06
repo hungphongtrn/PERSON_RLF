@@ -3,6 +3,4 @@ type: solver.lr_scheduler.LRSchedulerWithWarmup
 mode: cosine
 warmup_epochs: 1
 warmup_method: linear
-start_lr: 1.0e-6
-end_lr: 5.0e-6
 warmup_factor: null

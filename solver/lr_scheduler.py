@@ -18,13 +18,12 @@ class LRSchedulerWithWarmup(_LRScheduler):
         milestones: Optional[List[int]] = None,
         gamma: Optional[float] = None,
         warmup_factor: Optional[float] = None,
-        start_lr: Optional[float] = None,
-        end_lr: Optional[float] = None,
         power: Optional[float] = None,
     ):
         """
         LRSchedulerWithWarmup with iteration-based learning rate scheduling.
         Handles multiple parameter groups with different base learning rates.
+        Each parameter group should contain 'lr', 'start_lr', and 'end_lr'.
 
         Args:
             optimizer: Wrapped optimizer
@@ -37,10 +36,8 @@ class LRSchedulerWithWarmup(_LRScheduler):
             milestones: List of epoch numbers for step mode
             gamma: Multiplicative factor for step mode
             warmup_factor: Factor for warmup scaling
-            start_lr: Initial learning rate for poly/cosine modes (will be scaled for each group)
-            end_lr: Final learning rate for poly/cosine modes (will be scaled for each group)
-            power: Power factor for poly mode
         """
+        # Basic parameter validation
         if not isinstance(warmup_epochs, int) or warmup_epochs < 0:
             raise ValueError("warmup_epochs must be a non-negative integer")
 
@@ -59,6 +56,28 @@ class LRSchedulerWithWarmup(_LRScheduler):
             raise ValueError(
                 f"Invalid warmup_method {warmup_method}. Choose 'constant' or 'linear' or None"
             )
+
+        # Validate param groups have required learning rates
+        for i, group in enumerate(optimizer.param_groups):
+            required_params = ["lr", "start_lr", "end_lr"]
+            missing_params = [p for p in required_params if p not in group]
+            if missing_params:
+                raise ValueError(
+                    f"Parameter group {i} is missing required parameters: {missing_params}"
+                )
+            if not isinstance(group["start_lr"], (int, float)) or group["start_lr"] < 0:
+                raise ValueError(f"start_lr must be non-negative in group {i}")
+            if not isinstance(group["end_lr"], (int, float)) or group["end_lr"] < 0:
+                raise ValueError(f"end_lr must be non-negative in group {i}")
+            if group["start_lr"] < group["end_lr"]:
+                warnings.warn(
+                    f"start_lr is less than end_lr in group {i}, learning rate will increase over time"
+                )
+
+        # Get all learning rates from param groups
+        self.base_lrs = [group["lr"] for group in optimizer.param_groups]
+        self.start_lrs = [group["start_lr"] for group in optimizer.param_groups]
+        self.end_lrs = [group["end_lr"] for group in optimizer.param_groups]
 
         self.mode = mode
         self.warmup_epochs = warmup_epochs
@@ -88,25 +107,10 @@ class LRSchedulerWithWarmup(_LRScheduler):
             self.milestones = [m * n_iter_per_epoch for m in milestones]
             self.gamma = gamma
 
-        elif mode in ("poly", "cosine"):
-            if not isinstance(start_lr, (int, float)) or start_lr < 0:
-                raise ValueError("start_lr must be a non-negative number")
-            if not isinstance(end_lr, (int, float)) or end_lr < 0:
-                raise ValueError("end_lr must be a non-negative number")
-            if start_lr < end_lr:
-                warnings.warn(
-                    "start_lr is less than end_lr, learning rate will increase over time"
-                )
-
-            self.start_lr = start_lr
-            self.end_lr = (
-                end_lr if end_lr else start_lr
-            )  # Default to start_lr if end_lr is not provided
-
-            if mode == "poly":
-                if not isinstance(power, (int, float)) or power <= 0:
-                    raise ValueError("power must be a positive number for poly mode")
-                self.power = power
+        elif mode == "poly":
+            if not isinstance(power, (int, float)) or power <= 0:
+                raise ValueError("power must be a positive number for poly mode")
+            self.power = power
 
         # Warmup validation and defaults
         if warmup_method == "constant":
@@ -116,15 +120,6 @@ class LRSchedulerWithWarmup(_LRScheduler):
 
         if warmup_factor is not None and not isinstance(warmup_factor, (int, float)):
             raise ValueError("warmup_factor must be a number")
-
-        # Calculate scaling factors for each parameter group
-        self.scaling_factors = []
-        min_lr = min(group["lr"] for group in optimizer.param_groups)
-        for group in optimizer.param_groups:
-            self.scaling_factors.append(group["lr"] / min_lr)
-
-        self.start_lrs = [self.start_lr * factor for factor in self.scaling_factors]
-        self.end_lrs = [self.end_lr * factor for factor in self.scaling_factors]
 
         super().__init__(optimizer, last_epoch)
 

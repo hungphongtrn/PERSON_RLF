@@ -233,7 +233,7 @@ class LitTBPS(L.LightningModule):
             "softlabel_ratio": alpha,
             "total_loss": loss,
             "temperature": ret["temperature"],
-            "bias": ret["bias"]
+            "bias": ret["bias"],
         }
         self.log_dict(metrics, on_step=True, on_epoch=True, prog_bar=True)
 
@@ -242,6 +242,7 @@ class LitTBPS(L.LightningModule):
 
     def configure_optimizers(self):
         optimizer = build_optimizer(self.config.optimizer, self.model)
+
         self.config.scheduler.n_iter_per_epoch = self.num_iters_per_epoch
         scheduler = build_lr_scheduler(self.config.scheduler, optimizer)
         return {

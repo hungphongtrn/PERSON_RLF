@@ -29,6 +29,7 @@ def resolve_tuple(*args):
 
 
 OmegaConf.register_new_resolver("tuple", resolve_tuple)
+OmegaConf.register_new_resolver("eval", eval)
 
 
 @hydra.main(version_base="1.3", config_path="config")
@@ -112,7 +113,10 @@ def run(config: DictConfig) -> None:
     if config.logger.logger_type == "wandb":
         # Log figure to wandb
         wandb_visualized_data = prepare_prediction_for_wandb_table(
-            model.test_final_outputs, tokenizer
+            wrong_predictions=model.test_final_outputs,
+            tokenizer=tokenizer,
+            MEAN=torch.tensor(config.aug.img.mean),
+            STD=torch.tensor(config.aug.img.std),
         )
         columns = wandb_visualized_data["columns"]
         data = wandb_visualized_data["data"]

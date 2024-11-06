@@ -7,13 +7,14 @@ import torchvision.transforms as T
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-MEAN = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32)
-STD = torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32)
-REVERSE_MEAN = (-MEAN / STD).tolist()
-REVERSE_STD = (1.0 / STD).tolist()
 
-
-def visualize_test(wrong_predictions: List[Dict], tokenizer, k: int = 10):
+def visualize_test(
+    wrong_predictions: List[Dict],
+    tokenizer,
+    k: int = 10,
+    MEAN=[0.485, 0.456, 0.406],
+    STD=[0.229, 0.224, 0.225],
+):
     """
     Visualize k randomly selected predictions, showing each query, predicted images with PIDs, and correct image.
 
@@ -23,6 +24,8 @@ def visualize_test(wrong_predictions: List[Dict], tokenizer, k: int = 10):
         tokenizer: Tokenizer for decoding the query
         k: Number of predictions to visualize
     """
+    REVERSE_MEAN = (-MEAN / STD).tolist()
+    REVERSE_STD = (1.0 / STD).tolist()
     denormalize = T.Normalize(mean=REVERSE_MEAN, std=REVERSE_STD)
     toPIL = T.ToPILImage()
     transform = T.Compose([denormalize, toPIL])
@@ -161,7 +164,11 @@ def add_text_header(
 
 
 def prepare_prediction_for_wandb_table(
-    wrong_predictions: List[Dict], tokenizer, k: int = 10
+    wrong_predictions: List[Dict],
+    tokenizer,
+    k: int = 10,
+    MEAN: List[float] = [0.485, 0.456, 0.406],
+    STD: List[float] = [0.229, 0.224, 0.225],
 ):
     """
     Prepare the wrong predictions for logging in a Weights & Biases table.
@@ -172,6 +179,8 @@ def prepare_prediction_for_wandb_table(
     Returns:
         Dict[[columns, data], Any]: Dictionary containing columns and data for logging in a W&B table
     """
+    REVERSE_MEAN = (-MEAN / STD).tolist()
+    REVERSE_STD = (1.0 / STD).tolist()
     denormalize = T.Normalize(mean=REVERSE_MEAN, std=REVERSE_STD)
     toPIL = T.ToPILImage()
     transform = T.Compose([denormalize, toPIL])
@@ -182,7 +191,7 @@ def prepare_prediction_for_wandb_table(
     columns = ["Query"] + [f"Pred {i}" for i in range(1, 11)] + ["Ground Truth"]
     data = []
 
-    for idx, pred_dict in enumerate(k_selected_for_visualization):
+    for pred_dict in k_selected_for_visualization:
         row = []
 
         # 1. Query
@@ -193,9 +202,7 @@ def prepare_prediction_for_wandb_table(
         row.append(query_text)
 
         # 2. Predicted Images
-        for img_idx in range(1, 11):
-            img_key = f"img_{img_idx}"
-            img_data = pred_dict[img_key]
+        for img_data in pred_dict["predictions"]:
             pid = img_data["pid"]
 
             if isinstance(img_data["image"], torch.Tensor):

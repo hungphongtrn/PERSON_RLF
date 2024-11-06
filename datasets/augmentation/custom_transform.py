@@ -7,7 +7,7 @@ from PIL import Image
 class PILResize(torch.nn.Module):
     def __init__(
         self,
-        size: Tuple[int, int]= (256, 256),
+        size: Tuple[int, int] = (256, 256),
         resample: int = 3,
         reducing_gap: None = None,
     ):
@@ -21,7 +21,8 @@ class PILResize(torch.nn.Module):
             reducing_gap (int): An optional resampling filter. Default is None.
         """
         super().__init__()
-        self.size = size
+        # reverse the size
+        self.size = size[::-1]
         self.resample = resample
         self.reducing_gap = reducing_gap
 

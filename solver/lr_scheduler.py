@@ -38,6 +38,7 @@ class LRSchedulerWithWarmup(_LRScheduler):
             warmup_factor: Factor for warmup scaling
         """
         # Basic parameter validation
+        warmup_epochs = int(warmup_epochs)
         if not isinstance(warmup_epochs, int) or warmup_epochs < 0:
             raise ValueError("warmup_epochs must be a non-negative integer")
 

@@ -224,18 +224,9 @@ class LitTBPS(L.LightningModule):
     ) -> None:
         """Log training metrics"""
         # Log individual losses
-        for k, v in ret.items():
-            if k.endswith("loss"):
-                self.log(k, v, on_step=True, on_epoch=True, prog_bar=False)
-
-        # Log overall metrics
-        metrics = {
-            "softlabel_ratio": alpha,
-            "total_loss": loss,
-            "temperature": ret["temperature"],
-            "bias": ret["bias"],
-        }
-        self.log_dict(metrics, on_step=True, on_epoch=True, prog_bar=True)
+        self.log_dict(ret, on_step=True, on_epoch=True, prog_bar=False)
+        self.log("alpha", alpha, on_step=True, on_epoch=True, prog_bar=False)
+        self.log("total_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
 
         if epoch == 0 and batch_idx == 0:
             logger.info(f"Initial loss: {loss.item():.4f}")

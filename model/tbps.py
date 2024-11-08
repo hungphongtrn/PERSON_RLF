@@ -37,7 +37,7 @@ class TBPS(nn.Module):
             logger.info("Freezing text backbone")
 
         self.use_sigmoid = config.backbone.use_sigmoid
-        if not self.backbone.logit_bias:
+        if not hasattr(self.backbone, "logit_bias"):
             self.backbone.logit_bias = 0
 
         task_lists = []
@@ -248,8 +248,7 @@ class TBPS(nn.Module):
         caption_pooler_output = self.encode_text(caption_input)
 
         ret.update({"temperature": self.backbone.logit_scale})
-        if self.backbone.logit_bias:
-            ret.update({"bias": self.backbone.logit_bias})
+        ret.update({"bias": self.backbone.logit_bias})
 
         # Improve data efficiency with SimCLR
         if self.config.loss.get("SS", None):
@@ -313,10 +312,9 @@ class TBPS(nn.Module):
                 image_pooler_output,
                 caption_pooler_output,
                 logit_scale,
+                self.backbone.logit_bias,
                 self.config.loss.citc_inmodal_weight,
                 self.config.loss.citc_intermodal_weight,
-                self.use_sigmoid,
-                self.backbone.logit_bias,
             )
             ret.update({"citc_loss": loss * self.config.loss.citc_loss_weight})
 
@@ -330,10 +328,9 @@ class TBPS(nn.Module):
                 image_pooler_output,
                 caption_pooler_output,
                 logit_scale,
+                self.backbone.logit_bias,
                 sim_targets,
                 self.config.loss.ritc_eps,
-                self.use_sigmoid,
-                self.backbone.logit_bias,
             )
             ret.update({"ritc_loss": loss * self.config.loss.ritc_loss_weight})
 

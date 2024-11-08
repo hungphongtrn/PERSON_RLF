@@ -166,10 +166,9 @@ def compute_citc(
     image_features,
     text_features,
     logit_scale,
+    logit_bias,
     inmodal_weight,
     intermodal_weight,
-    use_sigmoid,
-    logit_bias,
 ):
     """
     Compute cyclic image-text contrastive loss
@@ -178,22 +177,15 @@ def compute_citc(
         image_features: image features after pooling
         text_features: text features after pooling
         logit_scale: scaling factor for the logits
+        logit_bias: bias for the logits if using sigmoid
         inmodal_weight: scaling factor for the cyclic loss
         intermodal_weight: scaling factor for the cyclic loss
-        use_sigmoid: use sigmoid or softmax for the similarity targets
-        logit_bias: bias for the logits if using sigmoid
     """
-    sim_i2i = logit_scale * image_features @ image_features.t()
-    sim_t2t = logit_scale * text_features @ text_features.t()
+    sim_i2i = logit_scale * image_features @ image_features.t() + logit_bias
+    sim_t2t = logit_scale * text_features @ text_features.t() + logit_bias
 
-    sim_i2t = logit_scale * image_features @ text_features.t()
-    sim_t2i = logit_scale * text_features @ image_features.t()
-
-    if use_sigmoid:
-        sim_i2i = sim_i2i + logit_bias
-        sim_t2t = sim_t2t + logit_bias
-        sim_i2t = sim_i2t + logit_bias
-        sim_t2i = sim_t2i + logit_bias
+    sim_i2t = logit_scale * image_features @ text_features.t() + logit_bias
+    sim_t2i = sim_i2t.t()
 
     inmodal_cyclic_loss = (sim_i2i - sim_t2t).square().mean() / (
         logit_scale * logit_scale
@@ -213,10 +205,9 @@ def compute_ritc(
     image_features,
     text_features,
     logit_scale,
+    logit_bias,
     sim_targets,
     eps=1e-2,
-    use_sigmoid=False,
-    logit_bias=0,
 ):
     """
     Compute the reverse image-text contrastive loss
@@ -226,25 +217,16 @@ def compute_ritc(
         text_features: text features after pooling
         logit_scale: scaling factor for the logits
     """
-    # TODO: Seem incorrect, need to check
-    if use_sigmoid:
-        target_prob = sim_targets
-        logits = logit_scale * image_features @ text_features.t() + logit_bias
-        sigmoid_prob = F.sigmoid(logits)
+    target_prob = (sim_targets + eps).log()
+    sim_i2t = logit_scale * image_features @ text_features.t() + logit_bias
+    sim_t2i = logit_scale * text_features @ image_features.t() + logit_bias
 
-        loss = F.kl_div(sigmoid_prob, target_prob, reduction="batchmean")
+    prob_i2t = F.log_softmax(sim_i2t, dim=1)
+    prob_t2i = F.log_softmax(sim_t2i, dim=1)
 
-    else:
-        target_prob = (sim_targets + eps).log()
-        sim_i2t = logit_scale * image_features @ text_features.t()
-        sim_t2i = logit_scale * text_features @ image_features.t()
-
-        prob_i2t = F.log_softmax(sim_i2t, dim=1)
-        prob_t2i = F.log_softmax(sim_t2i, dim=1)
-
-        kl_img = F.kl_div(target_prob, prob_i2t, log_target=True, reduction="batchmean")
-        kl_txt = F.kl_div(target_prob, prob_t2i, log_target=True, reduction="batchmean")
-        loss = (kl_img + kl_txt) / 2
+    kl_img = F.kl_div(target_prob, prob_i2t, log_target=True, reduction="batchmean")
+    kl_txt = F.kl_div(target_prob, prob_t2i, log_target=True, reduction="batchmean")
+    loss = (kl_img + kl_txt) / 2
 
     return loss
 
@@ -257,8 +239,8 @@ def compute_constrative(
     sim_targets,
     alpha,
     logit_scale,
-    use_sigmoid,
     logit_bias,
+    use_sigmoid,
 ):
     """
     Compute constrative loss for image-text pairs
@@ -272,54 +254,54 @@ def compute_constrative(
         sim_targets: similarity targets for the image-text pairs
         alpha: scaling factor for the similarity targets
         logit_scale: scaling factor for the logits
-        use_sigmoid: use sigmoid or softmax for the similarity targets
         logit_bias: bias for the logits if using sigmoid
+        use_sigmoid: use sigmoid or softmax for the similarity targets
     """
     if alpha != 0:
         with torch.no_grad():
-            # Soft labels for the similarity targets
-            sim_i2t_s = logit_scale * image_features_stopped @ text_features.t()
-            sim_t2i_s = logit_scale * text_features_stopped @ image_features.t()
-            # Soft + hard labels for the similarity targets
-            if use_sigmoid:
-                sim_targets = alpha * F.sigmoid(sim_i2t_s) + (1 - alpha) * sim_targets
+            logits_t2i_stopped = (
+                logit_scale * text_features_stopped @ image_features_stopped.t()
+                + logit_bias
+            )
+            logits_i2t_stopped = logits_t2i_stopped.t()
 
+            if use_sigmoid:
+                sim_targets = (
+                    alpha * F.sigmoid(logits_t2i_stopped) + (1 - alpha) * sim_targets
+                )
             else:
                 sim_i2t_targets = (
-                    alpha * F.softmax(sim_i2t_s, dim=1) + (1 - alpha) * sim_targets
+                    alpha * F.softmax(logits_i2t_stopped, dim=1)
+                    + (1 - alpha) * sim_targets
                 )
                 sim_t2i_targets = (
-                    alpha * F.softmax(sim_t2i_s, dim=1) + (1 - alpha) * sim_targets
+                    alpha * F.softmax(logits_t2i_stopped, dim=1)
+                    + (1 - alpha) * sim_targets
                 )
-    # If alpha is 0, use the hard labels
+
     else:
         sim_i2t_targets = sim_targets
         sim_t2i_targets = sim_targets
 
+    logit_t2i = logit_scale * text_features @ image_features.t() + logit_bias
+    logit_i2t = logit_scale * image_features @ text_features.t() + logit_bias
+
     if use_sigmoid:
-        # Compute the cosine similarity between the image and text features as the logits
-        logits = logit_scale * image_features @ text_features.t() + logit_bias
-        # Commpute the negative log-likelihood loss
-        loglik = F.logsigmoid(logits * sim_targets)
+        loglik = F.logsigmoid(logit_t2i * sim_targets)
         nll = -torch.sum(loglik, dim=-1)
         loss = nll.mean()
-        return loss
 
     else:
-        # Compute the cosine similarity between the image and text features as the logits
-        sim_i2t = logit_scale * image_features @ text_features.t()
-        sim_t2i = logit_scale * text_features @ image_features.t()
-        # Commpute the negative log-likelihood loss
         loss_i2t = -torch.sum(
-            F.log_softmax(sim_i2t, dim=1) * sim_i2t_targets, dim=1
+            F.log_softmax(logit_i2t, dim=1) * sim_i2t_targets, dim=1
         ).mean()
         loss_t2i = -torch.sum(
-            F.log_softmax(sim_t2i, dim=1) * sim_t2i_targets, dim=1
+            F.log_softmax(logit_t2i, dim=1) * sim_t2i_targets, dim=1
         ).mean()
 
-        # Loss is the average of the two losses
         loss = (loss_i2t + loss_t2i) / 2
-        return loss
+
+    return loss
 
 
 def compute_simclr(

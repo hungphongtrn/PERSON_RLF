@@ -1,4 +1,6 @@
 size: ${img_size}
+mean: ${tuple:0.5, 0.5, 0.5}
+std: ${tuple:0.5, 0.5, 0.5}
 augment_cfg:
   torchvision.transforms.Resize:
     size: ${img_size}

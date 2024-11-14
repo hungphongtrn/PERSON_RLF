@@ -9,8 +9,6 @@ text_config:
 vision_config:
   image_size: ${img_size}
   patch_size: 16
-num_visual_horizontal_patches: 8
-num_visual_vertical_patches: 24
 embedding_dim: 512
 use_sigmoid: false
 freeze:

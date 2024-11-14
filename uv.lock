@@ -17,6 +17,24 @@ wheels = [
 ]
 
 [[package]]
+name = "accelerate"
+version = "1.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "huggingface-hub" },
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "psutil" },
+    { name = "pyyaml" },
+    { name = "safetensors" },
+    { name = "torch" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/51/0b/179cc63d3a4f52e8cb233f2153a3e5a417522c85ea4b1dd25f6f2b377369/accelerate-1.1.1.tar.gz", hash = "sha256:0d39dfac557052bc735eb2703a0e87742879e1e40b88af8a2f9a93233d4cd7db", size = 335346 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d1/d5/0050b2820a1e709ffa623f9a9e8ae42d0903535f2150613cbfeb7f16932a/accelerate-1.1.1-py3-none-any.whl", hash = "sha256:61edd81762131b8d4bede008643fa1e1f3bf59bec710ebda9771443e24feae02", size = 333211 },
+]
+
+[[package]]
 name = "aiohappyeyeballs"
 version = "2.4.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1306,6 +1324,27 @@ wheels = [
 ]
 
 [[package]]
+name = "peft"
+version = "0.13.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "accelerate" },
+    { name = "huggingface-hub" },
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "psutil" },
+    { name = "pyyaml" },
+    { name = "safetensors" },
+    { name = "torch" },
+    { name = "tqdm" },
+    { name = "transformers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/97/e1/aab80b861b4c18e85482940d504b3a7ee525bdf6ed93a1a2871881a180f1/peft-0.13.2.tar.gz", hash = "sha256:0e0cbd40ebdf5fe4ea79f255880d02f96712d18899509369a2cc5768ad46d672", size = 350390 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/78/9d/5f95bfb298c8d3b4e3a107701f9a4e7774a0d4d1f8eb0c9d5420b80f7c9d/peft-0.13.2-py3-none-any.whl", hash = "sha256:d4e0951ec78eac11c45a051801c569913436888c578d48e5ce86996b715bc6ef", size = 320731 },
+]
+
+[[package]]
 name = "person-rlf"
 version = "0.1.0"
 source = { virtual = "." }
@@ -1324,6 +1363,7 @@ dependencies = [
     { name = "nltk" },
     { name = "nvitop" },
     { name = "omegaconf" },
+    { name = "peft" },
     { name = "pillow" },
     { name = "prettytable" },
     { name = "ruff" },
@@ -1352,6 +1392,7 @@ requires-dist = [
     { name = "nltk", specifier = ">=3.9.1" },
     { name = "nvitop", specifier = ">=1.3.2" },
     { name = "omegaconf", specifier = ">=2.3.0" },
+    { name = "peft", specifier = ">=0.13.2" },
     { name = "pillow", specifier = ">=10.4.0" },
     { name = "prettytable", specifier = ">=3.11.0" },
     { name = "ruff", specifier = ">=0.6.5" },

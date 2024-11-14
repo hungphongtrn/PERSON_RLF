@@ -31,15 +31,11 @@ def build_backbone_with_proper_layer_resize(backbone_cfg):
     logger.info(f"Building backbone model: {backbone_type}")
 
     checkpoint_path = modifiable_backbone_cfg.pop("path")
-    num_visual_vertical_patches = modifiable_backbone_cfg.pop(
-        "num_visual_vertical_patches"
-    )
-    num_visual_horizontal_patches = modifiable_backbone_cfg.pop(
-        "num_visual_horizontal_patches"
-    )
     original_model_include_cls_token = modifiable_backbone_cfg.pop(
         "original_model_include_cls_token"
     )
+    image_height, image_width = modifiable_backbone_cfg.vision_config.image_size
+    patch_size = modifiable_backbone_cfg.vision_config.patch_size
     config_type = modifiable_backbone_cfg.pop("config_type")
 
     # Parse configuration into Config object
@@ -122,6 +118,8 @@ def build_backbone_with_proper_layer_resize(backbone_cfg):
         logger.info(
             f"Resized {image_model_position_embedding} for image model from {original_state_dict[image_model_position_embedding].shape[0]} to {image_model_position_embedding_shape}"
         )
+        num_visual_vertical_patches = int(image_height / patch_size)
+        num_visual_horizontal_patches = int(image_width / patch_size)
         original_state_dict[image_model_position_embedding] = resize_pos_embed(
             original_state_dict[image_model_position_embedding],
             height=num_visual_vertical_patches,

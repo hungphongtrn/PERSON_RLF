@@ -1,10 +1,11 @@
 import logging
 import warnings
+from random import sample
 
 import pytorch_lightning as pl
 import torch
 from lightning.pytorch.utilities import CombinedLoader
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 
 from datasets.augmentation.transform import build_image_aug_pool, build_text_aug_pool
 from datasets.bases import (
@@ -65,6 +66,15 @@ class TBPSDataModule(pl.LightningDataModule):
         self.std = self.config.aug.img.std
 
     def setup(self, stage=None):
+        if self.config.dataset.proportion:
+            number_of_samples = int(
+                len(self.dataset.train) * self.config.dataset.proportion
+            )
+            self.dataset.train = sample(self.dataset.train, number_of_samples)
+            logger.info(
+                f"Using {number_of_samples} = {self.config.dataset.proportion} of the training set"
+            )
+
         if stage == "fit" or stage is None:
             if self.config.loss.MLM:
                 self.train_set = ImageTextMLMDataset(
@@ -97,19 +107,8 @@ class TBPSDataModule(pl.LightningDataModule):
                     std=self.std,
                 )
 
-            if self.config.dataset.proportion:
-                self.train_set, _ = random_split(
-                    self.train_set,
-                    [
-                        self.config.dataset.proportion,
-                        1.0 - self.config.dataset.proportion,
-                    ],
-                )
-                logger.info(
-                    f"Using {self.config.dataset.proportion} of the training set"
-                )
-
             logger.info("Validation set is available")
+
             self.val_img_set = ImageDataset(
                 dataset=self.dataset.val,
                 is_train=False,

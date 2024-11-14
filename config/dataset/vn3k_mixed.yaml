@@ -1,4 +1,4 @@
-dataset_name: VN3K_EN
+dataset_name: VN3K_MIXED
 text_length: ${tokenizer.model_max_length}
 batch_size: 8
 sampler: identity

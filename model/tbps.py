@@ -309,28 +309,25 @@ class TBPS(nn.Module):
         # Compute CITC loss
         if self.config.loss.get("CITC", None):
             loss = objectives.compute_citc(
-                image_pooler_output,
-                caption_pooler_output,
-                logit_scale,
-                self.backbone.logit_bias,
-                self.config.loss.citc_inmodal_weight,
-                self.config.loss.citc_intermodal_weight,
+                image_features=image_pooler_output,
+                text_features=caption_pooler_output,
+                logit_scale=logit_scale,
+                logit_bias=self.backbone.logit_bias,
+                inmodal_weight=self.config.loss.citc_inmodal_weight,
+                intermodal_weight=self.config.loss.citc_intermodal_weight,
             )
             ret.update({"citc_loss": loss * self.config.loss.citc_loss_weight})
 
         # Compute RITC loss
         if self.config.loss.get("RITC", None):
-            if self.use_sigmoid:
-                raise ValueError("RITC loss does not support sigmoid")
-
             sim_targets = self.prepare_sim_targets(batch["pids"], use_sigmoid=False)
             loss = objectives.compute_ritc(
-                image_pooler_output,
-                caption_pooler_output,
-                logit_scale,
-                self.backbone.logit_bias,
-                sim_targets,
-                self.config.loss.ritc_eps,
+                image_features=image_pooler_output,
+                text_features=caption_pooler_output,
+                logit_scale=logit_scale,
+                logit_bias=self.backbone.logit_bias,
+                sim_targets=sim_targets,
+                eps=self.config.loss.ritc_eps,
             )
             ret.update({"ritc_loss": loss * self.config.loss.ritc_loss_weight})
 

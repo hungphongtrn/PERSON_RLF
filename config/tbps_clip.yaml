@@ -14,5 +14,6 @@ defaults:
 training: true
 dataset_root_dir: .
 distributed: false
-img_size: ${tuple:384, 128}
+img_size_st: "(384, 384)"
+img_size: ${eval:${img_size_st}}
 seed: 2307

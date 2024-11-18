@@ -1,0 +1,20 @@
+uv run trainer.py -cn siglip_no_resize optimizer.param_groups.default.lr=1e-5 loss=tbps_clip  backbone.use_sigmoid=false    backbone.freeze.vision=true   
+uv run trainer.py -cn siglip_no_resize optimizer.param_groups.default.lr=1e-4 loss=tbps_clip  backbone.use_sigmoid=false    backbone.freeze.vision=true
+uv run trainer.py -cn siglip_no_resize optimizer.param_groups.default.lr=1e-5 loss=irra       backbone.use_sigmoid=false    backbone.freeze.vision=true   
+uv run trainer.py -cn siglip_no_resize optimizer.param_groups.default.lr=1e-4 loss=irra       backbone.use_sigmoid=false    backbone.freeze.vision=true
+uv run trainer.py -cn siglip_no_resize optimizer.param_groups.default.lr=1e-4 loss=tbps_clip  backbone.use_sigmoid=false
+uv run trainer.py -cn siglip           optimizer.param_groups.default.lr=1e-4 loss=tbps_clip  backbone.use_sigmoid=false
+uv run trainer.py -cn siglip_no_resize optimizer.param_groups.default.lr=1e-5 loss=tbps_clip  backbone.use_sigmoid=false
+uv run trainer.py -cn siglip           optimizer.param_groups.default.lr=1e-5 loss=tbps_clip  backbone.use_sigmoid=false
+uv run trainer.py -cn siglip_no_resize optimizer.param_groups.default.lr=1e-4 loss=irra       backbone.use_sigmoid=false
+uv run trainer.py -cn siglip           optimizer.param_groups.default.lr=1e-4 loss=irra       backbone.use_sigmoid=false
+uv run trainer.py -cn   siglip_no_resize    optimizer.param_groups.default.lr=1e-5  loss=tbps_clip      backbone.use_sigmoid=false      loss.softlabel_ratio=0      backbone.freeze.vision=true   
+uv run trainer.py -cn   siglip_no_resize    optimizer.param_groups.default.lr=1e-4  loss=tbps_clip      backbone.use_sigmoid=false      loss.softlabel_ratio=0      backbone.freeze.vision=true
+uv run trainer.py -cn   siglip_no_resize    optimizer.param_groups.default.lr=1e-5  loss=irra           backbone.use_sigmoid=false      loss.softlabel_ratio=0      backbone.freeze.vision=true   
+uv run trainer.py -cn   siglip_no_resize    optimizer.param_groups.default.lr=1e-4  loss=irra           backbone.use_sigmoid=false      loss.softlabel_ratio=0      backbone.freeze.vision=true
+uv run trainer.py -cn   siglip_no_resize    optimizer.param_groups.default.lr=1e-4  loss=tbps_clip      backbone.use_sigmoid=false  loss.softlabel_ratio=0      
+uv run trainer.py -cn   siglip              optimizer.param_groups.default.lr=1e-4  loss=tbps_clip      backbone.use_sigmoid=false  loss.softlabel_ratio=0    
+uv run trainer.py -cn   siglip_no_resize    optimizer.param_groups.default.lr=1e-5  loss=tbps_clip      backbone.use_sigmoid=false  loss.softlabel_ratio=0    
+uv run trainer.py -cn   siglip              optimizer.param_groups.default.lr=1e-5  loss=tbps_clip      backbone.use_sigmoid=false  loss.softlabel_ratio=0    
+uv run trainer.py -cn   siglip_no_resize    optimizer.param_groups.default.lr=1e-4  loss=irra           backbone.use_sigmoid=false  loss.softlabel_ratio=0    
+uv run trainer.py -cn   siglip              optimizer.param_groups.default.lr=1e-4  loss=irra           backbone.use_sigmoid=false  loss.softlabel_ratio=0    

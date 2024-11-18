@@ -1,6 +1,6 @@
 import logging
 import warnings
-from random import sample
+from random import Random
 
 import pytorch_lightning as pl
 import torch
@@ -67,10 +67,13 @@ class TBPSDataModule(pl.LightningDataModule):
 
     def setup(self, stage=None):
         if self.config.dataset.proportion:
+            random_generator = Random(self.config.seed)
             number_of_samples = int(
                 len(self.dataset.train) * self.config.dataset.proportion
             )
-            self.dataset.train = sample(self.dataset.train, number_of_samples)
+            self.dataset.train = random_generator.sample(
+                self.dataset.train, number_of_samples
+            )
             logger.info(
                 f"Using {number_of_samples} = {self.config.dataset.proportion} of the training set"
             )

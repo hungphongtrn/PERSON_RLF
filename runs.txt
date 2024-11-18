@@ -1,1 +1,0 @@
-uv run trainer.py -cn siglip_no_resize optimizer.param_groups.default.lr=1e-4 backbone.freeze.vision=true loss.ID=true loss.MLM=true loss.CITC=true trainer.max_epochs=30

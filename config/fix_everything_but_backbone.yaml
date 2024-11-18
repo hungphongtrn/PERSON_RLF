@@ -1,0 +1,19 @@
+# config/config.yaml
+defaults:
+  - _self_
+  - dataset: cuhk_pedes
+  - loss: contrastive
+  - aug: tbps_clip
+  - trainer: siglip
+  - optimizer: siglip
+  - scheduler: siglip
+  - tokenizer: siglip
+  - backbone: siglip
+  - logger: default
+
+training: true
+dataset_root_dir: .
+distributed: false
+img_size_str: "(384, 128)"
+img_size: ${eval:${img_size_str}}
+seed: 2307

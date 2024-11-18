@@ -1,0 +1,9 @@
+uv run trainer.py -cn fix_everything_but_backbone dataset.proportion=0.1    backbone=clip       tokenizer=clip      
+uv run trainer.py -cn fix_everything_but_backbone dataset.proportion=0.1    backbone=siglip     tokenizer=siglip
+uv run trainer.py -cn fix_everything_but_backbone dataset.proportion=0.1    backbone=clip       tokenizer=clip      img_size_str=(224,224)
+uv run trainer.py -cn fix_everything_but_backbone dataset.proportion=0.1    backbone=siglip     tokenizer=siglip    img_size_str=(256,256)
+
+uv run trainer.py -cn fix_everything_but_backbone dataset.proportion=0.1    backbone=clip       tokenizer=clip                                  optimizer.param_groups.default.lr=1e-5
+uv run trainer.py -cn fix_everything_but_backbone dataset.proportion=0.1    backbone=siglip     tokenizer=siglip
+uv run trainer.py -cn fix_everything_but_backbone dataset.proportion=0.1    backbone=clip       tokenizer=clip      img_size_str=(224,224)      optimizer.param_groups.default.lr=1e-5
+uv run trainer.py -cn fix_everything_but_backbone dataset.proportion=0.1    backbone=siglip     tokenizer=siglip    img_size_str=(256,256)      optimizer.param_groups.default.lr=1e-5

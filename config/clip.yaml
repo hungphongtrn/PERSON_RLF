@@ -1,0 +1,19 @@
+# config/config.yaml
+defaults:
+  - _self_
+  - dataset: cuhk_pedes_10_percent
+  - loss: tbps_clip
+  - aug: tbps_clip
+  - trainer: tbps_clip
+  - optimizer: tbps_clip_no_decay
+  - scheduler: tbps_clip
+  - tokenizer: clip
+  - backbone: clip
+  - logger: default
+
+training: true
+dataset_root_dir: .
+distributed: false
+img_size_str: 
+img_size: ${eval:${img_size_str}}
+seed: 2307

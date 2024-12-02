@@ -1,13 +1,16 @@
-siglip_checkpoints
 # ignore all __pycache__ directories regardless of position in the tree
 **/__pycache__
 VN3K
+CUHK-PEDES
 logs/
 tb_logs
 CUHK-PEDES
 clip_checkpoints
+siglip_checkpoints
+m_siglip_checkpoints
 .*
 notebooks
 *.ipynb
 outputs
 multirun
+experiments

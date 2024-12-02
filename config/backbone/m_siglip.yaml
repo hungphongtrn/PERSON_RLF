@@ -1,5 +1,5 @@
 type: model.siglip.modeling_siglip.SiglipModel
-path: siglip_checkpoints/model.safetensors
+path: m_siglip_checkpoints/model.safetensors
 config_type: model.siglip.configuration_siglip.SiglipConfig
 original_model_include_cls_token: false
 # text config
@@ -9,8 +9,8 @@ text_config:
   attention_dropout: 0.05
 vision_config:
   image_size: ${img_size}
-  patch_size: 14
-embedding_dim: 1152
+  patch_size: 16
+embedding_dim: 768
 use_sigmoid: true
 freeze:
   vision: false

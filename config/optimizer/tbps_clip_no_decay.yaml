@@ -1,0 +1,47 @@
+type: bitsandbytes.optim.AdamW8bit
+param_groups:
+  default:
+    lr: 1e-4
+    weight_decay: 0.0
+    weight_decay_bias: 0.0
+    betas: [0.9, 0.95]
+    eps: 1.0e-8
+    # scheduler
+    start_lr: 1.0e-6
+    end_lr: 5.0e-6
+  backbone:
+    lr: ${optimizer.param_groups.default.lr}
+    weight_decay: 0.0
+    weight_decay_bias: 0.0
+    betas: [0.9, 0.95]
+    eps: 1.0e-8
+    # scheduler
+    start_lr: ${eval:'${optimizer.param_groups.default.start_lr}'}
+    end_lr: ${eval:'${optimizer.param_groups.default.end_lr}'}
+  cross:
+    lr: ${eval:'${optimizer.param_groups.default.lr} * 5'}
+    weight_decay: 0.2
+    weight_decay_bias: 0.0
+    betas: [0.9, 0.98]
+    eps: 1.0e-8
+    # scheduler
+    start_lr: ${eval:'${optimizer.param_groups.default.start_lr} * 5'}
+    end_lr: ${eval:'${optimizer.param_groups.default.end_lr} * 5'}
+  classifier:
+    lr: ${eval:'${optimizer.param_groups.default.lr} * 5'}
+    weight_decay: 0.2
+    weight_decay_bias: 0.0
+    betas: [0.9, 0.98]
+    eps: 1.0e-8
+    # scheduler
+    start_lr: ${eval:'${optimizer.param_groups.default.start_lr} * 5'}
+    end_lr: ${eval:'${optimizer.param_groups.default.end_lr} * 5'}
+  simclr:
+    lr: ${eval:'${optimizer.param_groups.default.lr} * 5'}
+    weight_decay: 0.2
+    weight_decay_bias: 0.0
+    betas: [0.9, 0.98]
+    eps: 1.0e-8
+    # scheduler
+    start_lr: ${eval:'${optimizer.param_groups.default.start_lr} * 5'}
+    end_lr: ${eval:'${optimizer.param_groups.default.end_lr} * 5'}

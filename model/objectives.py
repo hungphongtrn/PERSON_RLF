@@ -1,14 +1,14 @@
-from sympy import use
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
 def compute_sdm(
-    image_fetures,
-    text_fetures,
+    image_features,
+    text_features,
     pid,
     logit_scale,
+    logit_bias,
     image_id=None,
     factor=0.3,
     epsilon=1e-8,
@@ -16,7 +16,7 @@ def compute_sdm(
     """
     Similarity Distribution Matching
     """
-    batch_size = image_fetures.shape[0]
+    batch_size = image_features.shape[0]
     pid = pid.reshape((batch_size, 1))  # make sure pid size is [batch_size, 1]
     pid_dist = pid - pid.t()
     labels = (pid_dist == 0).float()
@@ -29,22 +29,19 @@ def compute_sdm(
         labels = (labels - image_id_mask) * factor + image_id_mask
         # labels = (labels + image_id_mask) / 2
 
-    t2i_cosine_theta = text_fetures @ image_fetures.t()
+    t2i_cosine_theta = logit_scale * text_features @ image_features.t() + logit_bias
     i2t_cosine_theta = t2i_cosine_theta.t()
-
-    text_proj_image = logit_scale * t2i_cosine_theta
-    image_proj_text = logit_scale * i2t_cosine_theta
 
     # normalize the true matching distribution
     labels_distribute = labels / labels.sum(dim=1)
 
-    i2t_pred = F.softmax(image_proj_text, dim=1)
+    i2t_pred = F.softmax(i2t_cosine_theta, dim=1)
     i2t_loss = i2t_pred * (
-        F.log_softmax(image_proj_text, dim=1) - torch.log(labels_distribute + epsilon)
+        F.log_softmax(i2t_cosine_theta, dim=1) - torch.log(labels_distribute + epsilon)
     )
-    t2i_pred = F.softmax(text_proj_image, dim=1)
+    t2i_pred = F.softmax(t2i_cosine_theta, dim=1)
     t2i_loss = t2i_pred * (
-        F.log_softmax(text_proj_image, dim=1) - torch.log(labels_distribute + epsilon)
+        F.log_softmax(t2i_cosine_theta, dim=1) - torch.log(labels_distribute + epsilon)
     )
 
     loss = torch.mean(torch.sum(i2t_loss, dim=1)) + torch.mean(
@@ -207,6 +204,7 @@ def compute_ritc(
     logit_scale,
     logit_bias,
     sim_targets,
+    use_sigmoid,
     eps=1e-2,
 ):
     """
@@ -217,16 +215,22 @@ def compute_ritc(
         text_features: text features after pooling
         logit_scale: scaling factor for the logits
     """
-    target_prob = (sim_targets + eps).log()
     sim_i2t = logit_scale * image_features @ text_features.t() + logit_bias
-    sim_t2i = logit_scale * text_features @ image_features.t() + logit_bias
+    sim_t2i = sim_i2t.t()
+    target_prob = (sim_targets + eps).log()
+    if use_sigmoid:
+        prob = F.sigmoid(sim_i2t)
+        # normalize the probability
+        prob = prob / (prob.sum(dim=1, keepdim=True) + eps)
+        loss = F.kl_div(target_prob, prob, log_target=False, reduction="batchmean")
 
-    prob_i2t = F.log_softmax(sim_i2t, dim=1)
-    prob_t2i = F.log_softmax(sim_t2i, dim=1)
+    else:
+        prob_i2t = F.log_softmax(sim_i2t, dim=1)
+        prob_t2i = F.log_softmax(sim_t2i, dim=1)
 
-    kl_img = F.kl_div(target_prob, prob_i2t, log_target=True, reduction="batchmean")
-    kl_txt = F.kl_div(target_prob, prob_t2i, log_target=True, reduction="batchmean")
-    loss = (kl_img + kl_txt) / 2
+        kl_img = F.kl_div(target_prob, prob_i2t, log_target=True, reduction="batchmean")
+        kl_txt = F.kl_div(target_prob, prob_t2i, log_target=True, reduction="batchmean")
+        loss = (kl_img + kl_txt) / 2
 
     return loss
 

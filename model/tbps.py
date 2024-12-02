@@ -3,7 +3,6 @@ from collections import OrderedDict
 
 import torch
 import torch.nn as nn
-import numpy as np
 
 from model import objectives
 from model.layers import Transformer, QuickGELU, LayerNorm
@@ -320,13 +319,16 @@ class TBPS(nn.Module):
 
         # Compute RITC loss
         if self.config.loss.get("RITC", None):
-            sim_targets = self.prepare_sim_targets(batch["pids"], use_sigmoid=False)
+            sim_targets = self.prepare_sim_targets(
+                batch["pids"], use_sigmoid=self.use_sigmoid
+            )
             loss = objectives.compute_ritc(
                 image_features=image_pooler_output,
                 text_features=caption_pooler_output,
                 logit_scale=logit_scale,
                 logit_bias=self.backbone.logit_bias,
                 sim_targets=sim_targets,
+                use_sigmoid=self.use_sigmoid,
                 eps=self.config.loss.ritc_eps,
             )
             ret.update({"ritc_loss": loss * self.config.loss.ritc_loss_weight})
@@ -344,8 +346,10 @@ class TBPS(nn.Module):
                 }
             )
 
-        # Compute MLM loss
+        # Compute SDM loss
         if self.config.loss.get("SDM", None):
+            if self.config.backbone.use_sigmoid:
+                raise NotImplementedError("SDM loss does not support sigmoid.")
             ret.update(
                 {
                     "sdm_loss": (
@@ -354,6 +358,7 @@ class TBPS(nn.Module):
                             caption_pooler_output,
                             batch["pids"],
                             logit_scale,
+                            self.backbone.logit_bias,
                         )
                         * self.config.loss.sdm_loss_weight
                     )

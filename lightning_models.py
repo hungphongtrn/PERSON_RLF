@@ -22,6 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+
 class DataType(Enum):
     """Enum for different types of data processing"""
 

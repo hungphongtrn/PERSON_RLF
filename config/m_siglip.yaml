@@ -3,7 +3,7 @@ defaults:
   - _self_
   - dataset: cuhk_pedes_10_percent
   - loss: tbps_clip
-  - aug: tbps_clip
+  - aug: siglip
   - trainer: tbps_clip
   - optimizer: tbps_clip_no_decay
   - scheduler: tbps_clip

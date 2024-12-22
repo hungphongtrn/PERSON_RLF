@@ -17,3 +17,4 @@ distributed: false
 img_size_str: 
 img_size: ${eval:${img_size_str}}
 seed: 2307
+do_clipfit: false

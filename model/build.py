@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
 
 
-def build_backbone_with_proper_layer_resize(backbone_cfg):
+def build_backbone_with_proper_layer_resize(backbone_cfg, checkpoint_path: str = None, state_dict=None):
     """
     Build backbone model with proper layer resizing for TBPS.
 
@@ -30,7 +30,8 @@ def build_backbone_with_proper_layer_resize(backbone_cfg):
     backbone_type = modifiable_backbone_cfg.pop("type")
     logger.info(f"Building backbone model: {backbone_type}")
 
-    checkpoint_path = modifiable_backbone_cfg.pop("path")
+    if not checkpoint_path:
+        checkpoint_path = modifiable_backbone_cfg.pop("path")
     original_model_include_cls_token = modifiable_backbone_cfg.pop(
         "original_model_include_cls_token"
     )

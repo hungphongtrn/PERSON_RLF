@@ -93,6 +93,30 @@ def run(config: DictConfig) -> None:
 
     trainer.validate(model, val_loader)
 
+    if config.get("do_clipfit", True):
+        for name, param in model.named_parameters():
+            if "backbone" in name:
+                if "vision" in name:
+                    # Only train the layer norm in the vision backbone
+                    if "layer" in name and "norm" in name:
+                        param.requires_grad = True
+                    else:
+                        param.requires_grad = False
+                elif "text" in name:
+                    # Only train the bias of the linear in mlp layer
+                    if "mlp" in name:
+                        if "fc" in name:
+                            if "bias" in name:
+                                param.requires_grad = True
+                            else:
+                                param.requires_grad = False
+            else:
+                param.requires_grad = True
+
+        logging.info(
+            f"Trainable parameters: {[n for n, p in model.named_parameters() if p.requires_grad]}"
+        )
+
     if config.get("ckpt_path", None):
         logging.info(f"Resuming from checkpoint: {config.ckpt_path}")
         trainer.fit(

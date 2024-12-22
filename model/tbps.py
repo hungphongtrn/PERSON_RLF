@@ -348,8 +348,8 @@ class TBPS(nn.Module):
 
         # Compute SDM loss
         if self.config.loss.get("SDM", None):
-            if self.config.backbone.use_sigmoid:
-                raise NotImplementedError("SDM loss does not support sigmoid.")
+            # if self.config.backbone.use_sigmoid:
+            #     raise NotImplementedError("SDM loss does not support sigmoid.")
             ret.update(
                 {
                     "sdm_loss": (

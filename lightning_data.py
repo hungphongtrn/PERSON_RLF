@@ -7,21 +7,21 @@ import torch
 from lightning.pytorch.utilities import CombinedLoader
 from torch.utils.data import DataLoader
 
-from datasets.augmentation.transform import build_image_aug_pool, build_text_aug_pool
-from datasets.bases import (
+from data.augmentation.transform import build_image_aug_pool, build_text_aug_pool
+from data.bases import (
     ImageDataset,
     ImageTextDataset,
     ImageTextMLMDataset,
     TextDataset,
 )
-from datasets.cuhkpedes import CUHKPEDES
-from datasets.icfgpedes import ICFGPEDES
-from datasets.rstpreid import RSTPReid
-from datasets.sampler import RandomIdentitySampler
-from datasets.sampler_ddp import RandomIdentitySampler_DDP
-from datasets.vn3k_mixed import VN3K_MIXED
-from datasets.vn3k_vi import VN3K_VI
-from datasets.vn3k_en import VN3K_EN
+from data.cuhkpedes import CUHKPEDES
+from data.icfgpedes import ICFGPEDES
+from data.rstpreid import RSTPReid
+from data.sampler import RandomIdentitySampler
+from data.sampler_ddp import RandomIdentitySampler_DDP
+from data.vn3k_mixed import VN3K_MIXED
+from data.vn3k_vi import VN3K_VI
+from data.vn3k_en import VN3K_EN
 from utils.comm import get_world_size
 from utils.tokenizer_utils import get_tokenizer
 
@@ -67,6 +67,7 @@ class TBPSDataModule(pl.LightningDataModule):
 
     def setup(self, stage=None):
         if self.config.dataset.proportion:
+            # TODO: The subset sample has to contain a specific number of PID
             random_generator = Random(self.config.seed)
             number_of_samples = int(
                 len(self.dataset.train) * self.config.dataset.proportion

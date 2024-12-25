@@ -14,3 +14,6 @@ notebooks
 outputs
 multirun
 experiments
+*.safetensors
+cuhk_test_original_clip
+cuhk_test_original_m_siglip

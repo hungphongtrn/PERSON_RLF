@@ -3,7 +3,7 @@ mean: ${tuple:0.5, 0.5, 0.5}
 std: ${tuple:0.5, 0.5, 0.5}
 augment_cfg:
   # default processing
-  datasets.augmentation.custom_transform.PILResize:
+  data.augmentation.custom_transform.PILResize:
     size: ${img_size}
     resample: 3
     reducing_gap: null

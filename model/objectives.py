@@ -4,8 +4,8 @@ import torch.nn.functional as F
 
 
 def compute_sdm(
-    image_features,
-    text_features,
+    image_fetures,
+    text_fetures,
     pid,
     logit_scale,
     logit_bias,
@@ -16,7 +16,7 @@ def compute_sdm(
     """
     Similarity Distribution Matching
     """
-    batch_size = image_features.shape[0]
+    batch_size = image_fetures.shape[0]
     pid = pid.reshape((batch_size, 1))  # make sure pid size is [batch_size, 1]
     pid_dist = pid - pid.t()
     labels = (pid_dist == 0).float()
@@ -29,19 +29,25 @@ def compute_sdm(
         labels = (labels - image_id_mask) * factor + image_id_mask
         # labels = (labels + image_id_mask) / 2
 
-    t2i_cosine_theta = logit_scale * text_features @ image_features.t() + logit_bias
+    image_norm = image_fetures / image_fetures.norm(dim=1, keepdim=True)
+    text_norm = text_fetures / text_fetures.norm(dim=1, keepdim=True)
+
+    t2i_cosine_theta = text_norm @ image_norm.t()
     i2t_cosine_theta = t2i_cosine_theta.t()
+
+    text_proj_image = logit_scale * t2i_cosine_theta + logit_bias
+    image_proj_text = logit_scale * i2t_cosine_theta + logit_bias
 
     # normalize the true matching distribution
     labels_distribute = labels / labels.sum(dim=1)
 
-    i2t_pred = F.softmax(i2t_cosine_theta, dim=1)
+    i2t_pred = F.softmax(image_proj_text, dim=1)
     i2t_loss = i2t_pred * (
-        F.log_softmax(i2t_cosine_theta, dim=1) - torch.log(labels_distribute + epsilon)
+        F.log_softmax(image_proj_text, dim=1) - torch.log(labels_distribute + epsilon)
     )
-    t2i_pred = F.softmax(t2i_cosine_theta, dim=1)
+    t2i_pred = F.softmax(text_proj_image, dim=1)
     t2i_loss = t2i_pred * (
-        F.log_softmax(t2i_cosine_theta, dim=1) - torch.log(labels_distribute + epsilon)
+        F.log_softmax(text_proj_image, dim=1) - torch.log(labels_distribute + epsilon)
     )
 
     loss = torch.mean(torch.sum(i2t_loss, dim=1)) + torch.mean(
@@ -83,6 +89,10 @@ def compute_itc(
         text_features: text features after pooling
         logit_scale: scaling factor for the logits
     """
+    # Normalize the features
+    image_features = F.normalize(image_features, dim=1, p=2)
+    text_features = F.normalize(text_features, dim=1, p=2)
+
     batch_size = image_features.shape[0]
     labels = torch.arange(
         start=0, end=batch_size, dtype=torch.int64, device=image_features.device
@@ -178,6 +188,10 @@ def compute_citc(
         inmodal_weight: scaling factor for the cyclic loss
         intermodal_weight: scaling factor for the cyclic loss
     """
+    # Normalize the features
+    image_features = F.normalize(image_features, dim=1, p=2)
+    text_features = F.normalize(text_features, dim=1, p=2)
+
     sim_i2i = logit_scale * image_features @ image_features.t() + logit_bias
     sim_t2t = logit_scale * text_features @ text_features.t() + logit_bias
 
@@ -215,6 +229,10 @@ def compute_ritc(
         text_features: text features after pooling
         logit_scale: scaling factor for the logits
     """
+    # Normalize the features
+    image_features = F.normalize(image_features, dim=1, p=2)
+    text_features = F.normalize(text_features, dim=1, p=2)
+
     sim_i2t = logit_scale * image_features @ text_features.t() + logit_bias
     sim_t2i = sim_i2t.t()
     target_prob = (sim_targets + eps).log()
@@ -261,6 +279,14 @@ def compute_constrative(
         logit_bias: bias for the logits if using sigmoid
         use_sigmoid: use sigmoid or softmax for the similarity targets
     """
+    # Normalize the features
+    image_features = F.normalize(image_features, dim=1, p=2)
+    text_features = F.normalize(text_features, dim=1, p=2)
+    if image_features_stopped:
+        image_features_stopped = F.normalize(image_features_stopped, dim=1, p=2)
+    if text_features_stopped:
+        text_features_stopped = F.normalize(text_features_stopped, dim=1, p=2)
+
     if alpha != 0:
         with torch.no_grad():
             logits_t2i_stopped = (
@@ -317,12 +343,15 @@ def compute_simclr(
     Contrastive learning loss using SimCLR
 
     Args:
-        image_features: image features after pooling
-        text_features: text features after pooling
+        image_features_1: image features after augmentation 1
+        image_features_2: image features after augmentation 2
         temperature: temperature for the softmax
     """
     device = image_features_1.device
     batch_size = image_features_1.shape[0]
+
+    image_features_1 = F.normalize(image_features_1, dim=-1, p=2)
+    image_features_2 = F.normalize(image_features_2, dim=-1, p=2)
 
     # Create labels for the batch
     labels = torch.arange(start=0, end=batch_size, device=device)

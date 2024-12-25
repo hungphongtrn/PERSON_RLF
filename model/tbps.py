@@ -154,20 +154,20 @@ class TBPS(nn.Module):
 
         if not hasattr(self.backbone, "visual_projection"):
             # If no projection layer exists, normalize and return
-            normalized_pooler = pooler_output / pooler_output.norm(dim=1, keepdim=True)
+            # normalized_pooler = pooler_output / pooler_output.norm(dim=1, keepdim=True)
             if return_last_hidden:
-                return normalized_pooler, last_hidden
-            return normalized_pooler
+                return pooler_output, last_hidden
+            return pooler_output
 
         # If projection layer exists, project both outputs
         pooler_output = self.backbone.visual_projection(pooler_output)
-        normalized_pooler = pooler_output / pooler_output.norm(dim=1, keepdim=True)
+        # pooler_output = pooler_output / pooler_output.norm(dim=1, keepdim=True)
 
         if return_last_hidden:
             last_hidden = self.backbone.visual_projection(last_hidden)
-            return normalized_pooler, last_hidden
+            return pooler_output, last_hidden
 
-        return normalized_pooler
+        return pooler_output
 
     def encode_text(self, text, return_last_hidden=False):
         """
@@ -185,20 +185,20 @@ class TBPS(nn.Module):
 
         if not hasattr(self.backbone, "text_projection"):
             # If no projection layer exists, normalize and return
-            normalized_pooler = pooler_output / pooler_output.norm(dim=1, keepdim=True)
+            # normalized_pooler = pooler_output / pooler_output.norm(dim=1, keepdim=True)
             if return_last_hidden:
-                return normalized_pooler, last_hidden
-            return normalized_pooler
+                return pooler_output, last_hidden
+            return pooler_output
 
         # If projection layer exists, project both outputs
         pooler_output = self.backbone.text_projection(pooler_output)
-        normalized_pooler = pooler_output / pooler_output.norm(dim=1, keepdim=True)
+        # pooler_output = pooler_output / pooler_output.norm(dim=1, keepdim=True)
 
         if return_last_hidden:
             last_hidden = self.backbone.text_projection(last_hidden)
-            return normalized_pooler, last_hidden
+            return pooler_output, last_hidden
 
-        return normalized_pooler
+        return pooler_output
 
     def prepare_sim_targets(self, pids, use_sigmoid=False):
         """
@@ -240,11 +240,17 @@ class TBPS(nn.Module):
         logit_scale = self.backbone.logit_scale.exp()
         logit_scale.data = torch.clamp(logit_scale.data, max=100)
 
-        if self.config.loss.get("MLM", None):
+        if self.config.loss.get("MLM", None) or self.config.loss.get("Ring", None):
             image_pooler_output, image_last_hidden = self.encode_image(images, True)
+            if self.config.loss.get("Ring", None):
+                caption_pooler_output, caption_last_hidden = self.encode_text(
+                    caption_input, True
+                )
+            else:
+                caption_pooler_output = self.encode_text(caption_input)
         else:
             image_pooler_output = self.encode_image(images)
-        caption_pooler_output = self.encode_text(caption_input)
+            caption_pooler_output = self.encode_text(caption_input)
 
         ret.update({"temperature": self.backbone.logit_scale})
         ret.update({"bias": self.backbone.logit_bias})
@@ -377,6 +383,12 @@ class TBPS(nn.Module):
                     )
                 }
             )
+
+        # Compute Ring (Align and Unify) loss
+        if self.config.loss.get("Ring", None):
+            lam = 0  # A weight factor for align loss
+            image_logits = self.classifier(image_pooler_output).float()
+            text_logits = self.classifier(caption_pooler_output).float()
 
         # Compute ID loss
         if self.config.loss.get("ID", None):

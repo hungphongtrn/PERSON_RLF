@@ -1,3 +1,3 @@
 augment_cfg:
-  datasets.augmentation.text_transform.random_deletion:
+  data.augmentation.text_transform.random_deletion:
     p: 0.05

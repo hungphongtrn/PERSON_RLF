@@ -11,6 +11,7 @@ from lightning.pytorch.utilities import grad_norm
 from prettytable import PrettyTable
 
 from model.build import build_backbone_with_proper_layer_resize
+from model.lora import get_lora_model
 from model.tbps import TBPS
 from solver import build_lr_scheduler, build_optimizer
 from utils.metrics import rank
@@ -20,7 +21,6 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
-
 
 
 class DataType(Enum):
@@ -108,6 +108,12 @@ class LitTBPS(L.LightningModule):
 
         # Initialize state
         self._initialize_state()
+
+    ############# SETTING UP LORA ######################
+    def setup_lora(self, lora_config: Dict) -> None:
+        """Setup LORA for the model"""
+        self.backbone = get_lora_model(self.backbone, lora_config)
+        self.backbone.print_trainable_parameters()
 
     ############# INITIALIZATION FUNCTIONS #############
     def _initialize_model(

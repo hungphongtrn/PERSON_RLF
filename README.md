@@ -1,45 +1,65 @@
 # Person-Search using SigLIP
 
-## SETUP
+## Setup
 
+1. Clone the repository
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/hungphongtrn/PERSON_RLF.git
 ```
 
-- Get the siglip checkpoint
-
+2. Install uv package manager and sync the dependencies
 ```bash
-python prepare_checkpoints.py
+cd PERSON_RLF
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv sync
 ```
 
-- Modify the tokenizer_config.json by adding the following line to the `added_tokens_decoder`
-
-```json
-{
-    "250000": {
-      "content": "<mask>",
-      "lstrip": true,
-      "normalized": false,
-      "rstrip": true,
-      "single_word": false,
-      "special": true
-    }
-}
+3. Download the `siglip-base-patch16-256-multilingual` checkpoints
+```bash
+uv run prepare_checkpoints.py
 ```
 
-## Logs
-- 3/10/24:
-    - Fixed all issues with dataset loader. Flexibly control the augmentaion and training experiments
-        - Potential improvements: Split each part of the experiments into separate config files -> Use Hydra to manage the config files
-    - NaN Loss in RITC and SS
+4. Put the CUHK-FULL dataset in the root folder
+Here is the sample structure of the project
+```bash
+.
+|-- clip_checkpoints
+|-- config
+|-- CUHK-PEDES          # This is the dataset folder for CUHK-PEDES
+|-- VN3K                # This is the dataset folder for VN3K
+|-- data
+|-- experiments
+|-- lightning_data.py
+|-- lightning_models.py
+|-- model
+|-- m_siglip_checkpoints
+|-- outputs
+|-- prepare_checkpoints.py
+|-- __pycache__
+|-- pyproject.toml
+|-- README.md
+|-- requirements.txt
+|-- run.sh
+|-- siglip_checkpoints
+|-- solver
+|-- trainer.py
+|-- utils
+|-- uv.lock
+|-- ...
+```
 
-- 13/9/24:
-    - NaN loss is caused by `RuntimeError: Function 'SoftmaxBackward0' returned nan values in its 0th output.` in `attn_weights = nn.functional.softmax`.
-        - Gradient norm is too high:
-            - [X] Reduce the learning rate (1e-5->3e-6)
-            - [X] Clip the gradient
-    - The error was caused by the tokenizer. The original tokenizer includes `extra_tokens_...`, which makes the number of tokens larger than the embedding size. This causes the model to return NaN values.
+5. Log in to the Weights & Biases
+```bash
+uv run wandb login <API_KEY>
+```
 
+### Run the experiments
 
-- 10/9/24: Successfully ran 30% of the first epoch but encounter an error related to CUDA which might be due to NAN values in the loss. Next steps:
-    - Investigate what caused NaN values in the loss
+1. CUHK-FULL dataset
+```bash
+# With m-SigLIP
+# Run the training with TBPS method
+uv run trainer.py -cn m_siglip img_size_str="'(256,256)'" dataset=cuhk_pedes dataset.sampler=random loss.softlabel_ratio=0.0 trainer.max_epochs=60 optimizer=tbps_clip_no_decay optimizer.param_groups.default.lr=1e-5
+# Run the training with IRRA method
+uv run trainer.py -cn m_siglip img_size_str="'(256,256)'" dataset=cuhk_pedes dataset.sampler=identity dataset.num_instance=1 loss=irra loss.softlabel_ratio=0.0 trainer.max_epochs=60 optimizer=irra_no_decay optimizer.param_groups.default.lr=1e-5
+```

@@ -1,9 +1,9 @@
 from huggingface_hub import snapshot_download
 
 snapshot_download(
-    repo_id="google/siglip-so400m-patch14-384",
+    repo_id="google/siglip-base-patch16-256-multilingual",
     local_dir="siglip_checkpoints",
-    max_workers=2,
+    max_workers=4,
 )
 
 # snapshot_download(

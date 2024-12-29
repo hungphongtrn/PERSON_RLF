@@ -6,10 +6,18 @@ original_model_include_cls_token: false
 text_config:
   vocab_size: ${tokenizer.vocab_size}
   max_position_embeddings: ${tokenizer.model_max_length}
+  intermediate_size: 4304
   attention_dropout: 0.05
+  num_attention_heads: 16
+  num_hidden_layers: 27
+  hidden_size: 1152
 vision_config:
   image_size: ${img_size}
-  patch_size: 14
+  patch_size: 16
+  intermediate_size: 4304
+  num_attention_heads: 16
+  num_hidden_layers: 27
+  hidden_size: 1152
 embedding_dim: 1152
 use_sigmoid: true
 freeze:

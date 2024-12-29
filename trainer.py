@@ -13,6 +13,7 @@ from PIL import Image
 
 from lightning_models import LitTBPS
 from lightning_data import TBPSDataModule
+from model import lora
 from utils.logger import setup_logging
 from utils.visualize_test import prepare_prediction_for_wandb_table
 
@@ -66,6 +67,10 @@ def run(config: DictConfig) -> None:
         num_iters_per_epoch=len(train_loader),
         num_classes=dm.num_classes,
     )
+    if config.get("lora", None):
+        lora_config = config.lora
+        logging.info(f"Using LoRA on backbone with config: {lora_config}")
+        model.setup_lora(lora_config)
 
     logging.info(
         f"Number of steps per epcch: {len(train_loader) // config.trainer.accumulate_grad_batches}"

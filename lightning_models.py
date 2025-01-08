@@ -497,8 +497,8 @@ class LitTBPS(L.LightningModule):
             self._log_metrics(results, "test")
 
             # Process wrong predictions for text-to-image ranking only
-            t2i_ranking = ranking["t2i"]
-            self.test_final_outputs = self._process_wrong_predictions(t2i_ranking)
+            self.t2i_ranking = ranking["t2i"]
+            self.test_final_outputs = self._process_wrong_predictions(self.t2i_ranking)
 
             # Cleanup
             self.test_img_data.clear()

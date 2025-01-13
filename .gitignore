@@ -17,3 +17,10 @@ experiments
 *.safetensors
 cuhk_test_original_clip
 cuhk_test_original_m_siglip
+lightning_logs
+
+*.ckpt
+*.pth
+*.pt
+*.safetensors
+*.csv

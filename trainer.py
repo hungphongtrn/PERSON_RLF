@@ -3,7 +3,6 @@ import gc
 
 import hydra
 import lightning as L
-import matplotlib.pyplot as plt
 import torch
 import wandb
 from lightning.pytorch import seed_everything
@@ -13,7 +12,6 @@ from PIL import Image
 
 from lightning_models import LitTBPS
 from lightning_data import TBPSDataModule
-from model import lora
 from utils.logger import setup_logging
 from utils.visualize_test import prepare_prediction_for_wandb_table
 

@@ -261,14 +261,18 @@ def compute_ritc(
 
     sim_i2t = logit_scale * image_features @ text_features.t() + logit_bias
     sim_t2i = sim_i2t.t()
-    target_prob = (sim_targets + eps).log()
+
     if use_sigmoid:
+        sim_targets = (sim_targets + 1) / 2
+        sim_targets = sim_targets / (sim_targets.sum(dim=1, keepdim=True))
+        target_prob = (sim_targets + eps).log()
         prob = F.sigmoid(sim_i2t)
         # normalize the probability
         prob = prob / (prob.sum(dim=1, keepdim=True) + eps)
-        loss = F.kl_div(target_prob, prob, log_target=False, reduction="batchmean")
+        loss = F.kl_div(target_prob, prob, log_target=True, reduction="batchmean")
 
     else:
+        target_prob = (sim_targets + 1e-2).log()
         prob_i2t = F.log_softmax(sim_i2t, dim=1)
         prob_t2i = F.log_softmax(sim_t2i, dim=1)
 

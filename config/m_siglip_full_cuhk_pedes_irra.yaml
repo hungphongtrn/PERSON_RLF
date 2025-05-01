@@ -14,7 +14,7 @@ defaults:
 training: true
 dataset_root_dir: .
 distributed: false
-img_size_str: 
+img_size_str: "(256, 256)"
 img_size: ${eval:${img_size_str}}
 seed: 2307
 do_clipfit: false

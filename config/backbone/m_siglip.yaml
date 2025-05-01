@@ -15,4 +15,4 @@ use_sigmoid: true
 freeze:
   vision: false
   text: false
-num_epoch_for_boosting: 4
+num_epoch_for_boosting: 0

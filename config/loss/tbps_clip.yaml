@@ -21,7 +21,7 @@ id_loss_weight: 1.0
 SDM: false
 sdm_loss_weight: 1.0
 
-RITC: false
+RITC: true
 ritc_eps: 1.0e-2
 ritc_loss_weight: 1.0
 

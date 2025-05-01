@@ -1,8 +1,8 @@
 dataset_name: CUHK-PEDES
 text_length: ${tokenizer.model_max_length}
-batch_size: 8
-sampler: identity
-test_batch_size: 64
+batch_size: 32
+sampler: random
+test_batch_size: 512
 num_instance: 1
 num_workers: 2
 proportion: null

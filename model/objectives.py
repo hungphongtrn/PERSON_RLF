@@ -313,9 +313,9 @@ def compute_constrative(
     # Normalize the features
     image_features = F.normalize(image_features, dim=1, p=2)
     text_features = F.normalize(text_features, dim=1, p=2)
-    if image_features_stopped:
+    if image_features_stopped is not None:
         image_features_stopped = F.normalize(image_features_stopped, dim=1, p=2)
-    if text_features_stopped:
+    if text_features_stopped is not None:
         text_features_stopped = F.normalize(text_features_stopped, dim=1, p=2)
 
     if alpha != 0:

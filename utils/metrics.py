@@ -43,6 +43,19 @@ def rank(similarity, q_pids, g_pids, max_rank=10, get_mAP=True):
     return all_cmc, mAP, mINP, indices.cpu()
 
 
+def rank2(similarity, q_pids, g_pids, max_rank=10):
+    indices = torch.argsort(similarity, dim=1, descending=True)
+
+    pred_labels = g_pids[indices.cpu()]  # q * k
+    matches = pred_labels.eq(q_pids.view(-1, 1))  # q * k
+    # result = (~matches[:, 0]) & matches[:, 1]
+    all_cmc = matches[:, :max_rank].cumsum(1)  # cumulative sum
+    all_cmc[all_cmc > 1] = 1
+    all_cmc = all_cmc.float().mean(0) * 100
+    all_cmc = all_cmc.cpu().numpy()
+    return all_cmc[0], all_cmc[4], matches[:, 1]
+
+
 class Evaluator:
     def __init__(self, img_loader, txt_loader):
         self.img_loader = img_loader  # gallery

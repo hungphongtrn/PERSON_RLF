@@ -220,7 +220,7 @@ class TBPS(nn.Module):
             dim=1, keepdim=True
         )  # normalize the true matching distribution
 
-    def forward(self, batch, alpha):
+    def forward(self, batch, alpha, weights=None):
         """
         Forward pass of the model.
 
@@ -288,6 +288,7 @@ class TBPS(nn.Module):
                 logit_scale=logit_scale,
                 logit_bias=self.backbone.logit_bias,
                 use_sigmoid=self.use_sigmoid,
+                weights=weights,
             )
             if self.config.loss.get("MVS", None):
                 aug_images = batch["aug_images"]
@@ -306,6 +307,7 @@ class TBPS(nn.Module):
                     logit_scale=logit_scale,
                     use_sigmoid=self.use_sigmoid,
                     logit_bias=self.backbone.logit_bias,
+                    weights=weights,
                 )
                 nitc_loss = (nitc_loss + augmented_nitc_loss) / 2
 
@@ -365,6 +367,7 @@ class TBPS(nn.Module):
                             batch["pids"],
                             logit_scale,
                             self.backbone.logit_bias,
+                            weights=weights,
                         )
                         * self.config.loss.sdm_loss_weight
                     )
@@ -397,7 +400,9 @@ class TBPS(nn.Module):
             ret.update(
                 {
                     "id_loss": (
-                        objectives.compute_id(image_logits, text_logits, batch["pids"])
+                        objectives.compute_id(
+                            image_logits, text_logits, batch["pids"], weights=weights
+                        )
                         * self.config.loss.id_loss_weight
                     )
                 }
@@ -443,3 +448,17 @@ class TBPS(nn.Module):
             ret.update({"mlm_acc": acc})
 
         return ret
+
+    def forward2(self, batch):
+        caption_input = {
+            "input_ids": batch["caption_input_ids"],
+            "attention_mask": batch["caption_attention_mask"],
+        }
+
+        images = batch["images"]
+
+        with torch.no_grad():
+            image_feats = self.encode_image(images)
+            text_feats = self.encode_text(caption_input)
+
+        return image_feats, text_feats

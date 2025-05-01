@@ -63,6 +63,7 @@ def run(config: DictConfig) -> None:
         vocab_size=tokenizer.true_vocab_size,
         pad_token_id=tokenizer.pad_token_id,
         num_iters_per_epoch=len(train_loader),
+        train_set_length=len(dm.train_set),
         num_classes=dm.num_classes,
     )
     if config.get("lora", None):
@@ -71,7 +72,7 @@ def run(config: DictConfig) -> None:
         model.setup_lora(lora_config)
 
     logging.info(
-        f"Number of steps per epcch: {len(train_loader) // config.trainer.accumulate_grad_batches}"
+        f"Number of steps per epoch: {len(train_loader) // config.trainer.accumulate_grad_batches}"
     )
     logging.info(
         f"Number of total steps: {len(train_loader)// config.trainer.accumulate_grad_batches* config.trainer.max_epochs}"

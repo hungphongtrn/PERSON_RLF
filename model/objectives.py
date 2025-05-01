@@ -12,9 +12,11 @@ def compute_sdm(
     image_id=None,
     factor=0.3,
     epsilon=1e-8,
+    weights=None,
+    use_sigmoid=False,
 ):
     """
-    Similarity Distribution Matching
+    Similarity Distribution Matching with Boosting techniques
     """
     batch_size = image_fetures.shape[0]
     pid = pid.reshape((batch_size, 1))  # make sure pid size is [batch_size, 1]
@@ -32,27 +34,47 @@ def compute_sdm(
     image_norm = image_fetures / image_fetures.norm(dim=1, keepdim=True)
     text_norm = text_fetures / text_fetures.norm(dim=1, keepdim=True)
 
-    t2i_cosine_theta = text_norm @ image_norm.t()
-    i2t_cosine_theta = t2i_cosine_theta.t()
-
-    text_proj_image = logit_scale * t2i_cosine_theta + logit_bias
-    image_proj_text = logit_scale * i2t_cosine_theta + logit_bias
-
     # normalize the true matching distribution
     labels_distribute = labels / labels.sum(dim=1)
 
-    i2t_pred = F.softmax(image_proj_text, dim=1)
-    i2t_loss = i2t_pred * (
-        F.log_softmax(image_proj_text, dim=1) - torch.log(labels_distribute + epsilon)
-    )
-    t2i_pred = F.softmax(text_proj_image, dim=1)
-    t2i_loss = t2i_pred * (
-        F.log_softmax(text_proj_image, dim=1) - torch.log(labels_distribute + epsilon)
-    )
+    t2i_cosine_theta = text_norm @ image_norm.t()
 
-    loss = torch.mean(torch.sum(i2t_loss, dim=1)) + torch.mean(
-        torch.sum(t2i_loss, dim=1)
-    )
+    text_proj_image = logit_scale * t2i_cosine_theta + logit_bias
+
+    if use_sigmoid:
+        t2i_pred = F.sigmoid(text_proj_image)
+        # Normalize the sigmoid probability to 0-1 range
+        t2i_pred = t2i_pred / (t2i_pred.sum(dim=1, keepdim=True))
+        t2i_loss = t2i_pred * (
+            F.logsigmoid(text_proj_image) - torch.log(labels_distribute + epsilon)
+        )
+        if weights:
+            t2i_loss = weights * t2i_loss
+        loss = torch.mean(torch.sum(t2i_loss, dim=1))
+
+    else:
+        i2t_cosine_theta = t2i_cosine_theta.t()
+        image_proj_text = logit_scale * i2t_cosine_theta + logit_bias
+        i2t_pred = F.softmax(image_proj_text, dim=1)
+        i2t_loss = i2t_pred * (
+            F.log_softmax(image_proj_text, dim=1)
+            - torch.log(labels_distribute + epsilon)
+        )
+        t2i_pred = F.softmax(text_proj_image, dim=1)
+        t2i_loss = t2i_pred * (
+            F.log_softmax(text_proj_image, dim=1)
+            - torch.log(labels_distribute + epsilon)
+        )
+
+        if weights:
+            loss = torch.mean(weights * torch.sum(i2t_loss, dim=1)) + torch.mean(
+                weights * torch.sum(t2i_loss, dim=1)
+            )
+        else:
+            loss = torch.mean(torch.sum(i2t_loss, dim=1)) + torch.mean(
+                torch.sum(t2i_loss, dim=1)
+            )
+        loss = loss / 2
 
     return loss
 
@@ -113,6 +135,7 @@ def compute_id(
     image_logits,
     text_logits,
     labels,
+    weights=None,
 ):
     """
     Instance loss proposed at http://arxiv.org/abs/1711.05535
@@ -122,11 +145,14 @@ def compute_id(
         text_logits: text_features aften passing through a classifier
         labels: ground truth labels for the classification task
     """
-    criterion = nn.CrossEntropyLoss(reduction="mean")
-
-    loss = criterion(image_logits, labels) + criterion(text_logits, labels)
-
-    return loss / 2
+    criterion = nn.CrossEntropyLoss(reduction="none")
+    loss1 = criterion(image_logits, labels)
+    loss2 = criterion(text_logits, labels)
+    if weights:
+        loss1 = weights * loss1
+        loss2 = weights * loss2
+    loss = (torch.mean(loss1) + torch.mean(loss2)) / 2
+    return loss
 
 
 def compute_cmpm(image_embeddings, text_embeddings, labels, epsilon=1e-8):
@@ -263,6 +289,7 @@ def compute_constrative(
     logit_scale,
     logit_bias,
     use_sigmoid,
+    weights,
 ):
     """
     Compute constrative loss for image-text pairs
@@ -319,16 +346,20 @@ def compute_constrative(
     if use_sigmoid:
         loglik = F.logsigmoid(logit_t2i * sim_targets)
         nll = -torch.sum(loglik, dim=-1)
+        if weights is not None:
+            nll = weights * nll
         loss = nll.mean()
 
     else:
-        loss_i2t = -torch.sum(
-            F.log_softmax(logit_i2t, dim=1) * sim_i2t_targets, dim=1
-        ).mean()
-        loss_t2i = -torch.sum(
-            F.log_softmax(logit_t2i, dim=1) * sim_t2i_targets, dim=1
-        ).mean()
+        loss_i2t = -torch.sum(F.log_softmax(logit_i2t, dim=1) * sim_i2t_targets, dim=1)
+        loss_t2i = -torch.sum(F.log_softmax(logit_t2i, dim=1) * sim_t2i_targets, dim=1)
 
+        if weights is not None:
+            loss_i2t = weights * loss_i2t
+            loss_t2i = weights * loss_t2i
+
+        loss_i2t = loss_i2t.mean()
+        loss_t2i = loss_t2i.mean()
         loss = (loss_i2t + loss_t2i) / 2
 
     return loss

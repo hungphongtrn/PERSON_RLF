@@ -187,6 +187,7 @@ class ImageTextDataset(PreloadedDataset):
         )
 
         ret = {
+            "id": index,
             "pids": pid,
             "image_ids": image_id,
             "images": img,
@@ -339,6 +340,7 @@ class ImageTextMLMDataset(PreloadedDataset):
         )
 
         ret = {
+            "id": index,
             "pids": pid,
             "image_ids": image_id,
             "images": img,

@@ -1,9 +1,9 @@
 # Main contrastive loss
-NITC: true
+NITC: false
 nitc_loss_weight: 1.0
 softlabel_ratio: 0.0
 
-MVS: true
+MVS: false
 
 # Self-supervised losses following SimCLR
 SS: false
@@ -18,7 +18,7 @@ cmt_depth: 4
 ID: true
 id_loss_weight: 1.0
 
-SDM: false
+SDM: true
 sdm_loss_weight: 1.0
 
 RITC: false

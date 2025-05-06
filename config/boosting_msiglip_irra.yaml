@@ -1,0 +1,19 @@
+# config/config.yaml
+defaults:
+  - _self_
+  - dataset: vn3k_vi
+  - loss: irra
+  - aug: irra
+  - trainer: irra
+  - optimizer: irra_no_decay
+  - scheduler: irra
+  - tokenizer: m_siglip
+  - backbone: m_siglip
+  - logger: default
+
+training: true
+dataset_root_dir: .
+distributed: false
+img_size_str: "(256, 256)"
+img_size: ${eval:${img_size_str}}
+seed: 2307

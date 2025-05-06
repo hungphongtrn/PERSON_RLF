@@ -1,0 +1,3 @@
+uv run trainer.py -cn boosting_msiglip_irra backbone.num_epoch_for_boosting=4
+uv run trainer.py -cn boosting_msiglip_irra dataset=vn3k_en backbone.num_epoch_for_boosting=4
+uv run trainer.py -cn boosting_msiglip_irra dataset=cuhk_pedes_10_percent backbone.num_epoch_for_boosting=4b

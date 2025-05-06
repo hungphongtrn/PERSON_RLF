@@ -1,10 +1,7 @@
-import logging
-
 import torch
 import torch.nn.functional as F
 from prettytable import PrettyTable
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 def rank(similarity, q_pids, g_pids, max_rank=10, get_mAP=True):

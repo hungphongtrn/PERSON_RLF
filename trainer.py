@@ -1,10 +1,10 @@
-import logging
 import gc
 
 import hydra
 import lightning as L
 import torch
 import wandb
+from loguru import logger
 from lightning.pytorch import seed_everything
 from lightning.pytorch.callbacks import LearningRateMonitor
 from omegaconf import OmegaConf, DictConfig
@@ -14,13 +14,6 @@ from lightning_models import LitTBPS
 from lightning_data import TBPSDataModule
 from utils.logger import setup_logging
 from utils.visualize_test import prepare_prediction_for_wandb_table
-
-
-# Setting up the loggeer
-logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
 
 
 def resolve_tuple(*args):
@@ -49,8 +42,8 @@ def run(config: DictConfig) -> None:
     tokenizer = dm.tokenizer
 
     # Log an example of the dataset
-    logging.info(f"Example of the dataset: {dm.train_set[0]}")
-    logging.info(f"Image shape: {dm.train_set[0]['images'].shape}")
+    logger.info(f"Example of the dataset: {dm.train_set[0]}")
+    logger.info(f"Image shape: {dm.train_set[0]['images'].shape}")
 
     # Prepare dataloader
     train_loader = dm.train_dataloader()
@@ -68,14 +61,14 @@ def run(config: DictConfig) -> None:
     )
     if config.get("lora", None):
         lora_config = config.lora
-        logging.info(f"Using LoRA on backbone with config: {lora_config}")
+        logger.info(f"Using LoRA on backbone with config: {lora_config}")
         model.setup_lora(lora_config)
 
-    logging.info(
+    logger.info(
         f"Number of steps per epoch: {len(train_loader) // config.trainer.accumulate_grad_batches}"
     )
-    logging.info(
-        f"Number of total steps: {len(train_loader)// config.trainer.accumulate_grad_batches* config.trainer.max_epochs}"
+    logger.info(
+        f"Number of total steps: {len(train_loader) // config.trainer.accumulate_grad_batches * config.trainer.max_epochs}"
     )
 
     lr_monitor = LearningRateMonitor(logging_interval="step")
@@ -83,21 +76,21 @@ def run(config: DictConfig) -> None:
     # Preparing the trainer
     training_logger, checkpoint_callback = setup_logging(config)
     trainer_args = config.trainer
-    logging.info(f"Trainer Args: {trainer_args}")
-    logging.info(f"CE Loss ignored tokens: {dm.tokenizer.pad_token_id}")
+    logger.info(f"Trainer Args: {trainer_args}")
+    logger.info(f"CE Loss ignored tokens: {dm.tokenizer.pad_token_id}")
     trainer = L.Trainer(
         callbacks=[checkpoint_callback, lr_monitor],
         logger=training_logger,
         **trainer_args,
     )
-    logging.info(f"Test loader length: {len(iter(test_loader))}")
+    logger.info(f"Test loader length: {len(iter(test_loader))}")
 
     if config.logger.logger_type == "wandb":
         training_logger.watch(model, log="all")
 
     trainer.validate(model, val_loader)
 
-    if config.get("do_clipfit", True):
+    if config.get("do_clipfit"):
         for name, param in model.named_parameters():
             if "backbone" in name:
                 if "vision" in name:
@@ -117,12 +110,12 @@ def run(config: DictConfig) -> None:
             else:
                 param.requires_grad = True
 
-        logging.info(
+        logger.info(
             f"Trainable parameters: {[n for n, p in model.named_parameters() if p.requires_grad]}"
         )
 
     if config.get("ckpt_path", None):
-        logging.info(f"Resuming from checkpoint: {config.ckpt_path}")
+        logger.info(f"Resuming from checkpoint: {config.ckpt_path}")
         trainer.fit(
             model,
             train_dataloaders=train_loader,
@@ -130,7 +123,7 @@ def run(config: DictConfig) -> None:
             ckpt_path=config.ckpt_path,
         )
     else:
-        logging.info("Starting training from scratch")
+        logger.info("Starting training from scratch")
         trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
     trainer.test(model, ckpt_path="best", dataloaders=test_loader)

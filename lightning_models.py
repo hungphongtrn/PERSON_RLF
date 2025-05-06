@@ -1,4 +1,3 @@
-import logging
 from enum import Enum
 from typing import Optional, Dict, List, Any, Tuple
 from dataclasses import dataclass, field
@@ -6,8 +5,7 @@ from dataclasses import dataclass, field
 import lightning as L
 import torch
 import torch.nn.functional as F
-
-# import wandb
+from loguru import logger
 from lightning.pytorch.utilities import grad_norm
 from prettytable import PrettyTable
 
@@ -16,12 +14,6 @@ from model.lora import get_lora_model
 from model.tbps import TBPS
 from solver import build_lr_scheduler, build_optimizer
 from utils.metrics import rank, rank2
-
-# Configure logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-logger = logging.getLogger(__name__)
 
 
 class DataType(Enum):

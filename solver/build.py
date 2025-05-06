@@ -1,9 +1,8 @@
-import logging
 from typing import Any, Dict, List
 
-from utils.parse_module_str import parse_module_str
+from loguru import logger
 
-logger = logging.getLogger(__name__)
+from utils.parse_module_str import parse_module_str
 
 
 def build_optimizer(optimizer_cfg, model):

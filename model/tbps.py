@@ -1,13 +1,12 @@
-import logging
 from collections import OrderedDict
 
 import torch
 import torch.nn as nn
+from loguru import logger
 
 from model import objectives
 from model.layers import Transformer, QuickGELU, LayerNorm
 
-logger = logging.getLogger(__name__)
 
 TASK_LIST = ["ITC", "SDM", "CMPM", "ID", "MLM", "SS", "MVS", "RITC", "CITC", "NITC"]
 

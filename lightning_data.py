@@ -1,11 +1,10 @@
-import logging
 import warnings
 from random import Random
 
 import pytorch_lightning as pl
-import torch
 from lightning.pytorch.utilities import CombinedLoader
 from torch.utils.data import DataLoader
+from loguru import logger
 
 from data.augmentation.transform import build_image_aug_pool, build_text_aug_pool
 from data.bases import (
@@ -18,16 +17,16 @@ from data.cuhkpedes import CUHKPEDES
 from data.icfgpedes import ICFGPEDES
 from data.rstpreid import RSTPReid
 from data.sampler import RandomIdentitySampler
-from data.sampler_ddp import RandomIdentitySampler_DDP
+
+# from data.sampler_ddp import RandomIdentitySampler_DDP
 from data.vn3k_mixed import VN3K_MIXED
 from data.vn3k_vi import VN3K_VI
 from data.vn3k_en import VN3K_EN
-from utils.comm import get_world_size
+
+# from utils.comm import get_world_size
 from utils.tokenizer_utils import get_tokenizer
 
 # from torch.utils.data.distributed import DistributedSampler
-
-logger = logging.getLogger(__name__)
 # Filter UserWarning
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -142,24 +141,27 @@ class TBPSDataModule(pl.LightningDataModule):
     def train_dataloader(self):
         if self.config.dataset.sampler == "identity":
             if self.config.distributed:
+                raise NotImplementedError(
+                    "Distributed sampler is not implemented yet, please use random sampler"
+                )
                 logger.info("using ddp random identity sampler")
                 logger.info("DISTRIBUTED TRAIN START")
-                mini_batch_size = self.config.dataset.batch_size // get_world_size()
-                data_sampler = RandomIdentitySampler_DDP(
-                    self.dataset.train,
-                    self.config.dataset.batch_size,
-                    self.config.dataset.num_instance,
-                )
-                batch_sampler = torch.utils.data.sampler.BatchSampler(
-                    data_sampler, mini_batch_size, True
-                )
-                return DataLoader(
-                    self.train_set,
-                    batch_sampler=batch_sampler,
-                    num_workers=self.config.dataset.num_workers,
-                    # collate_fn=self.collate_fn,
-                    drop_last=False,
-                )
+                # mini_batch_size = self.config.dataset.batch_size // get_world_size()
+                # data_sampler = RandomIdentitySampler_DDP(
+                #     self.dataset.train,
+                #     self.config.dataset.batch_size,
+                #     self.config.dataset.num_instance,
+                # )
+                # batch_sampler = torch.utils.data.sampler.BatchSampler(
+                #     data_sampler, mini_batch_size, True
+                # )
+                # return DataLoader(
+                #     self.train_set,
+                #     batch_sampler=batch_sampler,
+                #     num_workers=self.config.dataset.num_workers,
+                #     # collate_fn=self.collate_fn,
+                #     drop_last=False,
+                # )
             else:
                 logger.info(
                     f"using random identity sampler: batch_size: {self.config.dataset.batch_size}, id: {self.config.dataset.batch_size // self.config.dataset.num_instance}, instance: {self.config.dataset.num_instance}"

@@ -3,7 +3,6 @@ import os
 from logging.handlers import RotatingFileHandler
 from typing import Optional, Dict, Any, Tuple, Union
 
-import wandb
 from omegaconf import DictConfig, OmegaConf
 from lightning.pytorch.loggers import TensorBoardLogger, WandbLogger, Logger
 from lightning.pytorch.callbacks import ModelCheckpoint

@@ -1,0 +1,6 @@
+defaults:
+    - img: no_augmentation_siglip
+    - text: no_augmentation_siglip
+
+image_random_k: -1
+text_random_k: -1

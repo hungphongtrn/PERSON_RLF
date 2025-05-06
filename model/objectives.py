@@ -18,12 +18,13 @@ def compute_sdm(
     """
     Similarity Distribution Matching with Boosting techniques
     """
+    # Calculate similarity_targets
     batch_size = image_fetures.shape[0]
     pid = pid.reshape((batch_size, 1))  # make sure pid size is [batch_size, 1]
     pid_dist = pid - pid.t()
     labels = (pid_dist == 0).float()
 
-    if image_id != None:
+    if image_id is not None:
         # print("Mix PID and ImageID to create soft label.")
         image_id = image_id.reshape((-1, 1))
         image_id_dist = image_id - image_id.t()
@@ -31,23 +32,29 @@ def compute_sdm(
         labels = (labels - image_id_mask) * factor + image_id_mask
         # labels = (labels + image_id_mask) / 2
 
+    # Normalize features
     image_norm = image_fetures / image_fetures.norm(dim=1, keepdim=True)
     text_norm = text_fetures / text_fetures.norm(dim=1, keepdim=True)
 
-    # normalize the true matching distribution
+    # Normalize the true matching distribution
     labels_distribute = labels / labels.sum(dim=1)
 
+    # Calculate the cosine similarity
     t2i_cosine_theta = text_norm @ image_norm.t()
-
     text_proj_image = logit_scale * t2i_cosine_theta + logit_bias
 
     if use_sigmoid:
+        # logger.debug("Experimental feature")
+        # Calculate the score using sigmoid
         t2i_pred = F.sigmoid(text_proj_image)
         # Normalize the sigmoid probability to 0-1 range
         t2i_pred = t2i_pred / (t2i_pred.sum(dim=1, keepdim=True))
+        # REMINDER: KL DIVERGENCE (y1 || y2) = y1 * (log(y1) - log(y2))
+        # Encourage the prediction to be sharper within a batch
         t2i_loss = t2i_pred * (
-            F.logsigmoid(text_proj_image) - torch.log(labels_distribute + epsilon)
+            torch.log(t2i_pred) - torch.log(labels_distribute + epsilon)
         )
+        # Add additional weights to some ids inside the batch
         if weights:
             t2i_loss = weights * t2i_loss
         loss = torch.mean(torch.sum(t2i_loss, dim=1))

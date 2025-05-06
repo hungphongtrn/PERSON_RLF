@@ -5,7 +5,3 @@ snapshot_download(
     local_dir="m_siglip_checkpoints",
     max_workers=4,
 )
-
-# snapshot_download(
-#     repo_id="openai/clip-vit-base-patch16", local_dir="clip_checkpoints", max_workers=2
-# )

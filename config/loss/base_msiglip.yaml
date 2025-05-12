@@ -3,7 +3,7 @@ NITC: true
 nitc_loss_weight: 1.0
 softlabel_ratio: 0
 
-MVS: false
+MVS: true
 
 # Self-supervised losses following SimCLR
 SS: false

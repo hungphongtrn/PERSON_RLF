@@ -44,6 +44,9 @@ def compute_sdm(
     text_proj_image = logit_scale * t2i_cosine_theta + logit_bias
 
     if use_sigmoid:
+        raise NotImplementedError(
+            "The sigmoid version of the loss is not implemented yet."
+        )
         # logger.debug("Experimental feature")
         # Calculate the score using sigmoid
         t2i_pred = F.sigmoid(text_proj_image)
@@ -81,7 +84,6 @@ def compute_sdm(
             loss = torch.mean(torch.sum(i2t_loss, dim=1)) + torch.mean(
                 torch.sum(t2i_loss, dim=1)
             )
-        loss = loss / 2
 
     return loss
 
@@ -270,6 +272,9 @@ def compute_ritc(
     sim_t2i = sim_i2t.t()
 
     if use_sigmoid:
+        raise NotImplementedError(
+            "The sigmoid version of the loss is not implemented yet."
+        )
         sim_targets = (sim_targets + 1) / 2
         sim_targets = sim_targets / (sim_targets.sum(dim=1, keepdim=True))
         target_prob = (sim_targets + eps).log()

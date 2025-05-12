@@ -91,6 +91,7 @@ def run(config: DictConfig) -> None:
     trainer.validate(model, val_loader)
 
     if config.get("do_clipfit"):
+        logger.debug("Using CLIPFIT")
         for name, param in model.named_parameters():
             if "backbone" in name:
                 if "vision" in name:

@@ -1,0 +1,3 @@
+uv run trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st="'(256,256)'" loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true
+uv run trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st="'(256,256)'" loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true loss.citc_loss_weight=0.3
+uv run trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st="'(256,256)'" loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true loss.citc_loss_weight=0.5

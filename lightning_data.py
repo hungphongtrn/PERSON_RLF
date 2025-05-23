@@ -68,6 +68,10 @@ class TBPSDataModule(pl.LightningDataModule):
 
     def setup(self, stage=None):
         if self.config.dataset.proportion:
+            if self.config.dataset.dataset_name == "TEN_PERCENT_CUHK_VN3K_MIX":
+                raise NotImplementedError(
+                    "This mixed dataset does not support subset sampling"
+                )
             # TODO: The subset sample has to contain a specific number of PID
             random_generator = Random(self.config.seed)
             number_of_samples = int(

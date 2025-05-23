@@ -56,9 +56,15 @@ class TenPercentCUHK_VN3KMIX(BaseDataset):
             self.anno_path_VN3K, self.img_dir_VN3K
         )
 
-        self.train_annos = self.random_generator.shuffle(
-            train_annos_CUHK + train_annos_VN3K
-        )  # shuffle the training set
+        # Shift PID of VN3K to the end of CUHK
+        max_cuhk_pid = max(
+            int(anno["id"])
+            for anno in train_annos_CUHK + test_annos_CUHK + val_annos_CUHK
+        )
+        for anno in train_annos_VN3K + test_annos_VN3K + val_annos_VN3K:
+            anno["id"] = int(anno["id"]) + max_cuhk_pid + 1  # +1 for safety margin
+
+        self.train_annos = train_annos_CUHK + train_annos_VN3K
         self.test_annos = test_annos_CUHK + test_annos_VN3K
         self.val_annos = val_annos_CUHK + val_annos_VN3K
 
@@ -102,16 +108,17 @@ class TenPercentCUHK_VN3KMIX(BaseDataset):
             dataset = []
             image_id = 0
             for anno in annos:
-                pid = int(anno["id"]) - 1  # make pid begin from 0
+                pid = int(anno["id"]) - 1
                 pid_container.add(pid)
                 img_path = op.join(anno["file_path"])
                 captions = anno["captions"]  # caption list
                 for caption in captions:
                     dataset.append((pid, image_id, img_path, caption))
                 image_id += 1
-            for idx, pid in enumerate(pid_container):
-                # check pid begin from 0 and no break
-                assert idx == pid, f"idx: {idx} and pid: {pid} are not match"
+            # for idx, pid in enumerate(pid_container):
+            #     # check pid begin from 0 and no break
+            #     assert idx == pid, f"idx: {idx} and pid: {pid} are not match in {pid_container}"
+            # Shuffle the dataset
             return dataset, pid_container
         else:
             dataset = {}

@@ -20,7 +20,7 @@ class RSTPReid(BaseDataset):
 
     dataset_dir = "RSTPReid"
 
-    def __init__(self, root="", verbose=True):
+    def __init__(self, root="", verbose=True, seed=42):
         super(RSTPReid, self).__init__()
         self.dataset_dir = op.join(root, self.dataset_dir)
         self.img_dir = op.join(self.dataset_dir, "imgs/")

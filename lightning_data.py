@@ -22,6 +22,7 @@ from data.sampler import RandomIdentitySampler
 from data.vn3k_mixed import VN3K_MIXED
 from data.vn3k_vi import VN3K_VI
 from data.vn3k_en import VN3K_EN
+from data.cuhk_10_percent_vn3k_mix import TenPercentCUHK_VN3KMIX
 
 # from utils.comm import get_world_size
 from utils.tokenizer_utils import get_tokenizer
@@ -41,11 +42,12 @@ class TBPSDataModule(pl.LightningDataModule):
             "VN3K_EN": VN3K_EN,
             "VN3K_VI": VN3K_VI,
             "VN3K_MIXED": VN3K_MIXED,
+            "TEN_PERCENT_CUHK_VN3K_MIX": TenPercentCUHK_VN3KMIX,
         }
         self.config = config
         print(config.dataset.dataset_name)
         self.dataset = __factory[config.dataset.dataset_name](
-            root=config.dataset_root_dir
+            root=config.dataset_root_dir, seed=config.seed
         )
         self.tokenizer = get_tokenizer(config.tokenizer)
         self.num_classes = len(self.dataset.train_id_container)

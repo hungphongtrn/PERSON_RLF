@@ -1,11 +1,12 @@
 import os.path as op
 from typing import List
+from random import Random, shuffle
 
 from utils.iotools import read_json
 from .bases import BaseDataset
 
 
-class CUHKPEDES(BaseDataset):
+class TenPercentCUHK_VN3KMIX(BaseDataset):
     """
     CUHK-PEDES
 
@@ -29,19 +30,37 @@ class CUHKPEDES(BaseDataset):
       'id', int}...]
     """
 
-    dataset_dir = "CUHK-PEDES"
+    dataset_dir_CUHK = "CUHK-PEDES"
+    dataset_dir_VN3K = "VN3K"
 
     def __init__(self, root="", verbose=True, seed=42):
-        super(CUHKPEDES, self).__init__()
-        self.dataset_dir = op.join(root, self.dataset_dir)
-        self.img_dir = op.join(self.dataset_dir, "imgs/")
+        super(TenPercentCUHK_VN3KMIX, self).__init__()
+        self.dataset_dir_CUHK = op.join(root, self.dataset_dir_CUHK)
+        self.img_dir_CUHK = op.join(self.dataset_dir_CUHK, "imgs/")
+        self.anno_path_CUHK = op.join(self.dataset_dir_CUHK, "reid_raw.json")
+        # self._check_before_run()
 
-        self.anno_path = op.join(self.dataset_dir, "reid_raw.json")
-        self._check_before_run()
+        self.random_generator = Random(seed)
 
-        self.train_annos, self.test_annos, self.val_annos = self._split_anno(
-            self.anno_path
+        self.dataset_dir_VN3K = op.join(root, self.dataset_dir_VN3K)
+        self.img_dir_VN3K = op.join(self.dataset_dir_VN3K, "imgs/")
+        self.anno_path_VN3K = op.join(self.dataset_dir_VN3K, "data_captions.json")
+        # self._check_before_run()
+
+        # Use 0.1 of the CUHK
+        train_annos_CUHK, test_annos_CUHK, val_annos_CUHK = self._split_anno(
+            self.anno_path_CUHK, self.img_dir_CUHK, proportion=0.1
         )
+        # Use full of VN3K
+        train_annos_VN3K, test_annos_VN3K, val_annos_VN3K = self._split_anno(
+            self.anno_path_VN3K, self.img_dir_VN3K
+        )
+
+        self.train_annos = self.random_generator.shuffle(
+            train_annos_CUHK + train_annos_VN3K
+        )  # shuffle the training set
+        self.test_annos = test_annos_CUHK + test_annos_VN3K
+        self.val_annos = val_annos_CUHK + val_annos_VN3K
 
         self.train, self.train_id_container = self._process_anno(
             self.train_annos, training=True
@@ -53,16 +72,28 @@ class CUHKPEDES(BaseDataset):
             self.logger.info("=> CUHK-PEDES Images and Captions are loaded")
             self.show_dataset_info()
 
-    def _split_anno(self, anno_path: str):
+    def _split_anno(self, anno_path: str, dir_path: str, proportion=None):
         train_annos, test_annos, val_annos = [], [], []
         annos = read_json(anno_path)
         for anno in annos:
+            # Make sure the file path is full path
+            anno["file_path"] = op.join(dir_path, anno["file_path"])
             if anno["split"] == "train":
                 train_annos.append(anno)
             elif anno["split"] == "test":
                 test_annos.append(anno)
             else:
                 val_annos.append(anno)
+
+        if proportion is not None:
+            if len(train_annos) > 0:
+                number_of_samples = int(len(train_annos) * proportion)
+                train_annos = self.random_generator.sample(
+                    train_annos, number_of_samples
+                )
+                self.logger.info(
+                    f"Using {number_of_samples} = {proportion} of the training set"
+                )
         return train_annos, test_annos, val_annos
 
     def _process_anno(self, annos: List[dict], training=False):
@@ -73,7 +104,7 @@ class CUHKPEDES(BaseDataset):
             for anno in annos:
                 pid = int(anno["id"]) - 1  # make pid begin from 0
                 pid_container.add(pid)
-                img_path = op.join(self.img_dir, anno["file_path"])
+                img_path = op.join(anno["file_path"])
                 captions = anno["captions"]  # caption list
                 for caption in captions:
                     dataset.append((pid, image_id, img_path, caption))
@@ -91,7 +122,7 @@ class CUHKPEDES(BaseDataset):
             for anno in annos:
                 pid = int(anno["id"])
                 pid_container.add(pid)
-                img_path = op.join(self.img_dir, anno["file_path"])
+                img_path = op.join(anno["file_path"])
                 img_paths.append(img_path)
                 image_pids.append(pid)
                 caption_list = anno["captions"]  # caption list
@@ -106,11 +137,11 @@ class CUHKPEDES(BaseDataset):
             }
             return dataset, pid_container
 
-    def _check_before_run(self):
-        """Check if all files are available before going deeper"""
-        if not op.exists(self.dataset_dir):
-            raise RuntimeError("'{}' is not available".format(self.dataset_dir))
-        if not op.exists(self.img_dir):
-            raise RuntimeError("'{}' is not available".format(self.img_dir))
-        if not op.exists(self.anno_path):
-            raise RuntimeError("'{}' is not available".format(self.anno_path))
+    # def _check_before_run(self):
+    #     """Check if all files are available before going deeper"""
+    #     if not op.exists(self.dataset_dir):
+    #         raise RuntimeError("'{}' is not available".format(self.dataset_dir))
+    #     if not op.exists(self.img_dir):
+    #         raise RuntimeError("'{}' is not available".format(self.img_dir))
+    #     if not op.exists(self.anno_path):
+    #         raise RuntimeError("'{}' is not available".format(self.anno_path))

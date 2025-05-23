@@ -31,7 +31,7 @@ class CUHKPEDES(BaseDataset):
 
     dataset_dir = "CUHK-PEDES"
 
-    def __init__(self, root="", verbose=True):
+    def __init__(self, root="", verbose=True, seed=42):
         super(CUHKPEDES, self).__init__()
         self.dataset_dir = op.join(root, self.dataset_dir)
         self.img_dir = op.join(self.dataset_dir, "imgs/")

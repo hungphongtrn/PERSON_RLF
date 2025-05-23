@@ -1,0 +1,2 @@
+uv run trainer.py -cn best_msiglip dataset.dataset_name=VN3K_EN dataset.proportion=null
+uv run trainer.py -cn best_msiglip dataset.dataset_name=VN3K_VI dataset.proportion=null

@@ -6,7 +6,7 @@ import torch
 import wandb
 from loguru import logger
 from lightning.pytorch import seed_everything
-from lightning.pytorch.callbacks import LearningRateMonitor
+from lightning.pytorch.callbacks import LearningRateMonitor, EarlyStopping
 from omegaconf import OmegaConf, DictConfig
 from PIL import Image
 
@@ -75,11 +75,18 @@ def run(config: DictConfig) -> None:
 
     # Preparing the trainer
     training_logger, checkpoint_callback = setup_logging(config)
+
+    callbacks = [checkpoint_callback, lr_monitor]
+    if config.get("early_stopping"):
+        logger.info(f"Using early stopping with config: {config.early_stopping}")
+        early_stopping_callback = EarlyStopping(**config.early_stopping)
+        callbacks.append(early_stopping_callback)
+
     trainer_args = config.trainer
     logger.info(f"Trainer Args: {trainer_args}")
     logger.info(f"CE Loss ignored tokens: {dm.tokenizer.pad_token_id}")
     trainer = L.Trainer(
-        callbacks=[checkpoint_callback, lr_monitor],
+        callbacks=callbacks,
         logger=training_logger,
         **trainer_args,
     )

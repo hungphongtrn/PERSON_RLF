@@ -27,6 +27,27 @@ OmegaConf.register_new_resolver("eval", eval)
 @hydra.main(version_base="1.3", config_path="config")
 def run(config: DictConfig) -> None:
     OmegaConf.set_struct(config, False)
+    # Bruteforce training configuration for CUHK-PEDES
+    logger.info("Applying bruteforce training configuration for CUHK-PEDES.")
+    config.dataset.name = "CUHK-PEDES"
+
+    # Loss configurations (MVS weight is assumed to be 1.0 by default)
+    config.loss.SS = True
+    config.loss.ss_loss_weight = 0.4
+    config.loss.CITC = True
+    config.loss.citc_loss_weight = 0.1
+
+    # Set a high number of epochs and enable early stopping to train until plateau
+    config.trainer.max_epochs = 200
+    config.early_stopping = OmegaConf.create(
+        {
+            "monitor": "val_loss",
+            "patience": 10,
+            "mode": "min",
+            "verbose": True,
+        }
+    )
+
     # Set the seed
     seed_everything(config.seed)
 

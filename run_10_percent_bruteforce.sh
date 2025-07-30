@@ -8,7 +8,7 @@ uv run trainer.py -cn simple_siglip_only_nitc_mvs \
     loss.citc_loss_weight=0.1 \
     trainer.gradient_clip_val=1.0 \
     trainer.gradient_clip_algorithm=norm \
-    +early_stopping.monitor=val_loss \
+    +early_stopping.monitor=val_score \
     +early_stopping.patience=10 \
     +early_stopping.mode=min \
     +early_stopping.verbose=true

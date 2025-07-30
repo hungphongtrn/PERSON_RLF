@@ -9,5 +9,5 @@ uv run trainer.py -cn simple_siglip_only_nitc_mvs \
     trainer.gradient_clip_algorithm=norm \
     +early_stopping.monitor=val_score \
     +early_stopping.patience=10 \
-    +early_stopping.mode=min \
+    +early_stopping.mode=max \
     +early_stopping.verbose=true

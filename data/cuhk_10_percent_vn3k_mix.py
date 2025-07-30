@@ -1,6 +1,6 @@
 import os.path as op
 from typing import List
-from random import Random, shuffle
+from random import Random
 
 from utils.iotools import read_json
 from .bases import BaseDataset
@@ -8,20 +8,6 @@ from .bases import BaseDataset
 
 class TenPercentCUHK_VN3KMIX(BaseDataset):
     """
-    CUHK-PEDES
-
-    Reference:
-    Person Search With Natural Language Description (CVPR 2017)
-
-    URL: https://openaccess.thecvf.com/content_cvpr_2017/html/Li_Person_Search_With_CVPR_2017_paper.html
-
-    Dataset statistics:
-    ### identities: 13003
-    ### images: 40206,  (train)  (test)  (val)
-    ### captions:
-    ### 9 images have more than 2 captions
-    ### 4 identity have only one image
-
     annotation format:
     [{'split', str,
       'captions', list,
@@ -81,6 +67,12 @@ class TenPercentCUHK_VN3KMIX(BaseDataset):
     def _split_anno(self, anno_path: str, dir_path: str, proportion=None):
         train_annos, test_annos, val_annos = [], [], []
         annos = read_json(anno_path)
+        source = None
+        if self.dataset_dir_CUHK in anno_path:
+            source = "CUHK"
+        elif self.dataset_dir_VN3K in anno_path:
+            source = "VN3K"
+
         for anno in annos:
             # Make sure the file path is full path
             anno["file_path"] = op.join(dir_path, anno["file_path"])
@@ -98,7 +90,7 @@ class TenPercentCUHK_VN3KMIX(BaseDataset):
                     train_annos, number_of_samples
                 )
                 self.logger.info(
-                    f"Using {number_of_samples} = {proportion} of the training set"
+                    f"Using {number_of_samples} = {proportion} of the training set for {source}"
                 )
         return train_annos, test_annos, val_annos
 

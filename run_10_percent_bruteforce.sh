@@ -1,5 +1,5 @@
 uv run trainer.py -cn simple_siglip_only_nitc_mvs \
-    dataset.name='CUHK-PEDES' \
+    dataset.dataset_name='CUHK-PEDES' \
     dataset.proportion=0.1 \
     trainer.max_epochs=200 \
     loss.SS=true \

@@ -11,4 +11,5 @@ uv run trainer.py -cn simple_siglip_only_nitc_mvs \
     +early_stopping.monitor=val_score \
     +early_stopping.patience=10 \
     +early_stopping.mode=max \
-    +early_stopping.verbose=true
+    +early_stopping.verbose=true \
+    img_size_st="'(256,256)'"

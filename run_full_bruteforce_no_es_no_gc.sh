@@ -5,4 +5,5 @@ uv run trainer.py -cn simple_siglip_only_nitc_mvs \
     loss.SS=true \
     loss.ss_loss_weight=0.4 \
     loss.CITC=true \
-    loss.citc_loss_weight=0.1
+    loss.citc_loss_weight=0.1 \
+    img_size_st="'(256,256)'"

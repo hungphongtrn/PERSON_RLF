@@ -1,6 +1,6 @@
 uv run trainer.py -cn simple_siglip_only_nitc_mvs \
     dataset.dataset_name='CUHK-PEDES' \
-    dataset.batch_size=64 \
+    dataset.batch_size=48 \
     dataset.proportion=0.1 \
     trainer.max_epochs=200 \
     loss.SS=true \

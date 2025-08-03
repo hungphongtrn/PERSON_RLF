@@ -1,4 +1,5 @@
 uv run trainer.py -cn simple_siglip_only_nitc_mvs \
+    dataset="cuhk_pedes" \
     dataset.dataset_name='CUHK-PEDES' \
     trainer.max_epochs=200 \
     dataset.batch_size=48 \

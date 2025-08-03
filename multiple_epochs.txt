@@ -1,0 +1,3 @@
+uv run trainer.py -cn simple_siglip_only_nitc_mvs dataset.dataset_name='CUHK-PEDES' trainer.max_epochs=80 dataset.batch_size=48 loss.SS=true loss.ss_loss_weight=0.4 loss.CITC=true loss.citc_loss_weight=0.1 img_size_st="'(256,256)'"
+uv run trainer.py -cn simple_siglip_only_nitc_mvs dataset.dataset_name='CUHK-PEDES' trainer.max_epochs=120 dataset.batch_size=48 loss.SS=true loss.ss_loss_weight=0.4 loss.CITC=true loss.citc_loss_weight=0.1 img_size_st="'(256,256)'"
+uv run trainer.py -cn simple_siglip_only_nitc_mvs dataset.dataset_name='CUHK-PEDES' trainer.max_epochs=160 dataset.batch_size=48 loss.SS=true loss.ss_loss_weight=0.4 loss.CITC=true loss.citc_loss_weight=0.1 img_size_st="'(256,256)'"

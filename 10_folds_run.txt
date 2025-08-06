@@ -1,10 +1,10 @@
-trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st='(256,256)' loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=0
-trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st='(256,256)' loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=1
-trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st='(256,256)' loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=2
-trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st='(256,256)' loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=3
-trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st='(256,256)' loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=4
-trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st='(256,256)' loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=5
-trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st='(256,256)' loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=6
-trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st='(256,256)' loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=7
-trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st='(256,256)' loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=8
-trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st='(256,256)' loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=9
+uv run trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st="'(256,256)'" loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=0
+uv run trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st="'(256,256)'" loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=1
+uv run trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st="'(256,256)'" loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=2
+uv run trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st="'(256,256)'" loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=3
+uv run trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st="'(256,256)'" loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=4
+uv run trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st="'(256,256)'" loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=5
+uv run trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st="'(256,256)'" loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=6
+uv run trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st="'(256,256)'" loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=7
+uv run trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st="'(256,256)'" loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=8
+uv run trainer.py -cn simple_siglip_only_nitc_mvs trainer.max_epochs=60 img_size_st="'(256,256)'" loss.SS=true loss.ss_loss_weight=0.8 loss.CITC=true loss.CITC=true dataset.fold_id=9

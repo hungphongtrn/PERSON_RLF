@@ -73,15 +73,33 @@ class TBPSDataModule(pl.LightningDataModule):
                     "This mixed dataset does not support subset sampling"
                 )
             # TODO: The subset sample has to contain a specific number of PID
-            random_generator = Random(self.config.seed)
-            number_of_samples = int(
-                len(self.dataset.train) * self.config.dataset.proportion
-            )
-            self.dataset.train = random_generator.sample(
-                self.dataset.train, number_of_samples
-            )
+            # Shuffle dataset once for reproducible folds
+            shuffled_train_data = self.dataset.train[:]
+            Random(self.config.seed).shuffle(shuffled_train_data)
+
+            proportion = self.config.dataset.proportion
+            num_folds = int(1 / proportion)
+            fold_size = int(len(shuffled_train_data) * proportion)
+
+            # Get current fold index from config.
+            # You need to add `fold_id` to your dataset config and vary it for each run.
+            fold_id = self.config.dataset.get("fold_id", 0)
+
+            if not (0 <= fold_id < num_folds):
+                raise ValueError(
+                    f"fold_id {fold_id} is out of bounds for {num_folds} folds. "
+                    f"Valid fold_id is from 0 to {num_folds - 1}."
+                )
+
+            # Calculate start and end index for the fold
+            start_idx = fold_id * fold_size
+            end_idx = start_idx + fold_size
+
+            # Select the fold. Slicing handles the case where the last fold might be smaller.
+            self.dataset.train = shuffled_train_data[start_idx:end_idx]
+
             logger.info(
-                f"Using {number_of_samples} = {self.config.dataset.proportion} of the training set"
+                f"Using fold {fold_id}/{num_folds - 1} of the training set, with {len(self.dataset.train)} samples."
             )
 
         if stage == "fit" or stage is None:
